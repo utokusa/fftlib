@@ -23,6 +23,27 @@ def reverse_bits(x: int, bit_length: int):
     return rev
 
 
+def _fft_simple_helper(input_buf, inverse=False):
+    n = len(input_buf)
+    if n == 1:
+        return input_buf
+
+    output_buf = np.zeros(n, dtype=np.complex128)
+
+    # Even rows
+    next_even_input = input_buf[0 : n // 2] + input_buf[n // 2 : n]
+    output_buf[0:n:2] = _fft_simple_helper(next_even_input, inverse)
+
+    # odd rows
+    angle_sign = -1 if inverse else 1
+    w_angle = -1 * np.array(np.array(range(n // 2))) * angle_sign * 2 / n * np.pi * 1j
+    w = np.exp(w_angle)  # 'W' in textbooks
+    next_odd_input = w * (input_buf[0 : n // 2] - input_buf[n // 2 : n])
+    output_buf[1:n:2] = _fft_simple_helper(next_odd_input, inverse)
+
+    return output_buf
+
+
 def fft_simple(input_buf, inverse=False):
     n = len(input_buf)
     if n == 0:
@@ -31,23 +52,9 @@ def fft_simple(input_buf, inverse=False):
     if not is_power_of_two(n):
         raise ValueError("Input buffer length should be power of two")
 
-    if n == 1:
-        return input_buf
-
-    output_buf = np.zeros(n, dtype=np.complex128)
-
-    # Even rows
-    next_even_input = input_buf[0 : n // 2] + input_buf[n // 2 : n]
-    output_buf[0:n:2] = fft_simple(next_even_input)
-
-    # odd rows
-    angle_sign = -1 if inverse else 1
-    w_angle = -1 * np.array(np.array(range(n // 2))) * angle_sign * 2 / n * np.pi * 1j
-    w = np.exp(w_angle)  # 'W' in textbooks
+    output_buf = _fft_simple_helper(input_buf, inverse)
     divisor = n if inverse else 1  # 'N' in textbooks
-    next_odd_input = w / divisor * (input_buf[0 : n // 2] - input_buf[n // 2 : n])
-    output_buf[1:n:2] = fft_simple(next_odd_input)
-
+    output_buf = output_buf / divisor
     return output_buf
 
 
@@ -150,7 +157,7 @@ if __name__ == "__main__":
     assert reverse_bits(0b011, 3) == 0b110
     assert reverse_bits(0b010, 3) == 0b010
 
-    # _test_fft_function(fft_simple) # TODO: fix
+    _test_fft_function(fft_simple)
     _test_fft_function(fft)
 
     print("OK")
