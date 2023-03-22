@@ -5,3 +5,6 @@ disable=
     missing-function-docstring,
     invalid-name,
     redefined-outer-name,
+    fixme,
+    too-many-locals
+
