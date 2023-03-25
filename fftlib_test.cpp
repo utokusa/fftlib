@@ -55,9 +55,9 @@ TEST_CASE("Reverse bits of unsigned integers", "[reverseBits]") {
 }
 
 TEST_CASE("FFT 0", "[fft]") {
-  std::vector<double> input_buf{0, 1, 0, 1, 0, 1, 0, 1};
+  std::vector<std::complex<double>> input_buf{0, 1, 0, 1, 0, 1, 0, 1};
   auto output_buf = fft(input_buf);
-  printVec(output_buf);
+  // printVec(output_buf);
   std::vector<std::complex<double>> expected{{4., 0.}, {0., 0.},  {0., 0.},
                                              {0., 0.}, {-4., 0.}, {0., 0.},
                                              {0., 0.}, {0., 0.}};
@@ -65,15 +65,101 @@ TEST_CASE("FFT 0", "[fft]") {
                Catch::Matchers::Approx(extractReal(expected)).margin(MARGIN));
   REQUIRE_THAT(extractImag(output_buf),
                Catch::Matchers::Approx(extractImag(expected)).margin(MARGIN));
+  auto reversed = fft(output_buf, true);
+  REQUIRE_THAT(extractReal(input_buf),
+               Catch::Matchers::Approx(extractReal(reversed)).margin(MARGIN));
+  REQUIRE_THAT(extractImag(input_buf),
+               Catch::Matchers::Approx(extractImag(reversed)).margin(MARGIN));
 }
 
 TEST_CASE("FFT 1", "[fft]") {
-  std::vector<double> input_buf{0, 1, 2, 3, 4, 5, 6, 7};
+  std::vector<std::complex<double>> input_buf{0, 1, 2, 3, 4, 5, 6, 7};
   auto output_buf = fft(input_buf);
-  printVec(output_buf);
+  // printVec(output_buf);
   std::vector<std::complex<double>> expected{
       {28, 0}, {-4, 9.65685},  {-4, 4},  {-4, 1.65685},
       {-4, 0}, {-4, -1.65685}, {-4, -4}, {-4, -9.65685}};
+  REQUIRE_THAT(extractReal(output_buf),
+               Catch::Matchers::Approx(extractReal(expected)).margin(MARGIN));
+  REQUIRE_THAT(extractImag(output_buf),
+               Catch::Matchers::Approx(extractImag(expected)).margin(MARGIN));
+  auto reversed = fft(output_buf, true);
+  REQUIRE_THAT(extractReal(input_buf),
+               Catch::Matchers::Approx(extractReal(reversed)).margin(MARGIN));
+  REQUIRE_THAT(extractImag(input_buf),
+               Catch::Matchers::Approx(extractImag(reversed)).margin(MARGIN));
+}
+
+TEST_CASE("FFT 2", "[fft]") {
+  std::vector<std::complex<double>> input_buf{0, 1, 2, 3};
+  auto output_buf = fft(input_buf);
+  // printVec(output_buf);
+  std::vector<std::complex<double>> expected{
+      {6, 0}, {-2, 2}, {-2, 0}, {-2, -2}};
+  REQUIRE_THAT(extractReal(output_buf),
+               Catch::Matchers::Approx(extractReal(expected)).margin(MARGIN));
+  REQUIRE_THAT(extractImag(output_buf),
+               Catch::Matchers::Approx(extractImag(expected)).margin(MARGIN));
+  auto reversed = fft(output_buf, true);
+  REQUIRE_THAT(extractReal(input_buf),
+               Catch::Matchers::Approx(extractReal(reversed)).margin(MARGIN));
+  REQUIRE_THAT(extractImag(input_buf),
+               Catch::Matchers::Approx(extractImag(reversed)).margin(MARGIN));
+}
+
+TEST_CASE("FFT 3", "[fft]") {
+  std::vector<std::complex<double>> input_buf{1, 1};
+  auto output_buf = fft(input_buf);
+  // printVec(output_buf);
+  std::vector<std::complex<double>> expected{{2, 0}, {0, 0}};
+  REQUIRE_THAT(extractReal(output_buf),
+               Catch::Matchers::Approx(extractReal(expected)).margin(MARGIN));
+  REQUIRE_THAT(extractImag(output_buf),
+               Catch::Matchers::Approx(extractImag(expected)).margin(MARGIN));
+  auto reversed = fft(output_buf, true);
+  REQUIRE_THAT(extractReal(input_buf),
+               Catch::Matchers::Approx(extractReal(reversed)).margin(MARGIN));
+  REQUIRE_THAT(extractImag(input_buf),
+               Catch::Matchers::Approx(extractImag(reversed)).margin(MARGIN));
+}
+
+TEST_CASE("FFT 4", "[fft]") {
+  std::vector<std::complex<double>> input_buf{1};
+  auto output_buf = fft(input_buf);
+  // printVec(output_buf);
+  std::vector<std::complex<double>> expected{1};
+  REQUIRE_THAT(extractReal(output_buf),
+               Catch::Matchers::Approx(extractReal(expected)).margin(MARGIN));
+  REQUIRE_THAT(extractImag(output_buf),
+               Catch::Matchers::Approx(extractImag(expected)).margin(MARGIN));
+  auto reversed = fft(output_buf, true);
+  REQUIRE_THAT(extractReal(input_buf),
+               Catch::Matchers::Approx(extractReal(reversed)).margin(MARGIN));
+  REQUIRE_THAT(extractImag(input_buf),
+               Catch::Matchers::Approx(extractImag(reversed)).margin(MARGIN));
+}
+
+TEST_CASE("FFT 5 (Empty)", "[fft]") {
+  std::vector<std::complex<double>> input_buf{};
+  auto output_buf = fft(input_buf);
+  // printVec(output_buf);
+  std::vector<std::complex<double>> expected{};
+  REQUIRE_THAT(extractReal(output_buf),
+               Catch::Matchers::Approx(extractReal(expected)).margin(MARGIN));
+  REQUIRE_THAT(extractImag(output_buf),
+               Catch::Matchers::Approx(extractImag(expected)).margin(MARGIN));
+  auto reversed = fft(output_buf, true);
+  REQUIRE_THAT(extractReal(input_buf),
+               Catch::Matchers::Approx(extractReal(reversed)).margin(MARGIN));
+  REQUIRE_THAT(extractImag(input_buf),
+               Catch::Matchers::Approx(extractImag(reversed)).margin(MARGIN));
+}
+
+TEST_CASE("FFT 6 (Non-power-of-two length)", "[fft]") {
+  std::vector<std::complex<double>> input_buf{0, 1, 2};
+  auto output_buf = fft(input_buf);
+  // printVec(output_buf);
+  std::vector<std::complex<double>> expected{};
   REQUIRE_THAT(extractReal(output_buf),
                Catch::Matchers::Approx(extractReal(expected)).margin(MARGIN));
   REQUIRE_THAT(extractImag(output_buf),

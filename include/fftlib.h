@@ -36,13 +36,14 @@ unsigned long reverseBits(unsigned long x, unsigned long bit_length) {
   return rev;
 }
 
-std::vector<std::complex<double>> fft(const std::vector<double>& input_buf) {
+std::vector<std::complex<double>> fft(
+    const std::vector<std::complex<double>>& input_buf, bool inverse = false) {
   auto n = input_buf.size();
   if (n == 0 || !isPowerOfTwo(static_cast<int>(n))) {
     return {};
   }
   if (n == 1) {
-    return {input_buf[0]};
+    return input_buf;
   }
 
   std::vector<std::complex<double>> output_buf(n);
@@ -55,7 +56,6 @@ std::vector<std::complex<double>> fft(const std::vector<double>& input_buf) {
 
   // Calculate FFT using butterfly operation
   for (size_t i = 0; i < num_loop; i++) {
-    // TODO: optimize (not to use double)
     auto num_group = static_cast<size_t>(std::pow(2, i));
     auto num_element_per_group = n / num_group;
     for (size_t j = 0; j < num_group; j++) {
@@ -69,13 +69,11 @@ std::vector<std::complex<double>> fft(const std::vector<double>& input_buf) {
         auto idx = k0 - k0_start;
         auto x0 = output_buf[k0];
         auto x1 = output_buf[k1];
-        // auto angle_sign = inverse ? -1.0 : 0.0;
+        auto angle_sign = inverse ? -1.0 : 1.0;
         constexpr double pi = M_PI;
-        // TODO: use angle_sign
         std::complex<double> w_angle = {
-            0.0, 0.0 - 1.0 * 2.0 * pi /
-                           static_cast<double>(num_element_per_group) *
-                           static_cast<double>(idx)};
+            0.0, -1.0 * 2.0 * pi / static_cast<double>(num_element_per_group) *
+                     static_cast<double>(idx) * angle_sign};
         std::complex<double> w = std::exp(w_angle);
         output_buf[k0] = x0 + x1;
         output_buf[k1] = w * (x0 - x1);
@@ -83,7 +81,11 @@ std::vector<std::complex<double>> fft(const std::vector<double>& input_buf) {
     }
   }
 
-  // TODO: divisor, inverse
+  // 'N' in textbook
+  double divisor = inverse ? static_cast<double>(n) : 1.0;
+  for (size_t i = 0; i < n; i++) {
+    output_buf[i] = output_buf[i] / divisor;
+  }
 
   // Restore order of output using bit inversion
   for (size_t i = 0; i < n / 2; i++) {
