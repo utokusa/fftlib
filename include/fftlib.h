@@ -17,8 +17,7 @@ namespace fftlib {
 
 bool isPowerOfTwo(int x) { return (x & (x - 1)) == 0; }
 
-// TODO: handle negative
-unsigned long bit_length(unsigned long x) {
+unsigned long bitLength(unsigned long x) {
   unsigned long length = 0;
   while (x) {
     x >>= 1;
@@ -27,8 +26,7 @@ unsigned long bit_length(unsigned long x) {
   return length;
 }
 
-// TODO: handle negative
-unsigned long reverse_bits(unsigned long x, unsigned long bit_length) {
+unsigned long reverseBits(unsigned long x, unsigned long bit_length) {
   unsigned long rev = 0;
   for (unsigned long i = 0; i < bit_length; i++) {
     rev <<= 1;
@@ -52,7 +50,7 @@ std::vector<std::complex<double>> fft(const std::vector<double>& input_buf) {
   for (size_t i = 0; i < n; i++) {
     output_buf[i] = input_buf[i];
   }
-  auto index_bit_len = bit_length(n - 1);
+  auto index_bit_len = bitLength(n - 1);
   auto num_loop = index_bit_len;
 
   // Calculate FFT using butterfly operation
@@ -89,7 +87,7 @@ std::vector<std::complex<double>> fft(const std::vector<double>& input_buf) {
 
   // Restore order of output using bit inversion
   for (size_t i = 0; i < n / 2; i++) {
-    auto j = reverse_bits(i, index_bit_len);
+    auto j = reverseBits(i, index_bit_len);
     swap(output_buf[i], output_buf[j]);
   }
 
