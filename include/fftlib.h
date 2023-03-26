@@ -36,22 +36,25 @@ unsigned long reverseBits(unsigned long x, unsigned long bit_length) {
   return rev;
 }
 
+// Returns if success
 template <class T>
-std::vector<std::complex<T>> fft(const std::vector<std::complex<T>>& input_buf,
-                                 bool inverse = false) {
+bool fft(const std::vector<std::complex<T>>& input_buf,
+         std::vector<std::complex<T>>& output_buf, bool inverse = false) {
+  constexpr bool SUCCESS = true;
   auto n = input_buf.size();
-  if (n == 0 || !isPowerOfTwo(static_cast<int>(n))) {
-    return {};
-  }
-  if (n == 1) {
-    return input_buf;
+  if (n == 0 || !isPowerOfTwo(static_cast<int>(n)) || n != output_buf.size()) {
+    return !SUCCESS;
   }
 
-  std::vector<std::complex<T>> output_buf(n);
   // Copy input
   for (size_t i = 0; i < n; i++) {
     output_buf[i] = input_buf[i];
   }
+
+  if (n == 1) {
+    return SUCCESS;
+  }
+
   auto index_bit_len = bitLength(n - 1);
   auto num_loop = index_bit_len;
 
@@ -94,6 +97,19 @@ std::vector<std::complex<T>> fft(const std::vector<std::complex<T>>& input_buf,
     swap(output_buf[i], output_buf[j]);
   }
 
-  return output_buf;
+  return SUCCESS;
 }
+
+template <class T>
+std::vector<std::complex<T>> fft(const std::vector<std::complex<T>>& input_buf,
+                                 bool inverse = false) {
+  auto n = input_buf.size();
+  std::vector<std::complex<T>> output_buf(n);
+  if (fft(input_buf, output_buf, inverse)) {
+    return output_buf;
+  } else {
+    return {};
+  }
+}
+
 }  // namespace fftlib
