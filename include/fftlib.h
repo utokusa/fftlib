@@ -73,11 +73,12 @@ bool fft(const std::vector<std::complex<T>>& input_buf,
         auto idx = k0 - k0_start;
         auto x0 = output_buf[k0];
         auto x1 = output_buf[k1];
-        auto angle_sign = inverse ? -1.0 : 1.0;
-        constexpr T pi = M_PI;
-        std::complex<T> w_angle = {
-            0.0, -1.0 * 2.0 * pi / static_cast<T>(num_element_per_group) *
-                     static_cast<T>(idx) * angle_sign};
+        auto angle_sign = static_cast<T>(inverse ? -1.0 : 1.0);
+        constexpr T pi = static_cast<T>(M_PI);
+        std::complex<T> w_angle = {static_cast<T>(0.0),
+                                   static_cast<T>(-1.0 * 2.0) * pi /
+                                       static_cast<T>(num_element_per_group) *
+                                       static_cast<T>(idx) * angle_sign};
         std::complex<T> w = std::exp(w_angle);
         output_buf[k0] = x0 + x1;
         output_buf[k1] = w * (x0 - x1);

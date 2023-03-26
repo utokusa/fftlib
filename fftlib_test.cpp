@@ -165,4 +165,26 @@ TEST_CASE("FFT 6 (Non-power-of-two length)", "[fft]") {
   REQUIRE_THAT(extractImag(output_buf),
                Catch::Matchers::Approx(extractImag(expected)).margin(MARGIN));
 }
+
+TEST_CASE("FFT 6 (float)", "[fft]") {
+  std::vector<std::complex<float>> input_buf{0, 1, 2, 3, 4, 5, 6, 7};
+  auto output_buf = fft(input_buf);
+  // printVec(output_buf);
+  std::vector<std::complex<float>> expected{
+      {28.f, 0.f}, {-4.f, 9.65685f},  {-4.f, 4.f},  {-4.f, 1.65685f},
+      {-4.f, 0.f}, {-4.f, -1.65685f}, {-4.f, -4.f}, {-4.f, -9.65685f}};
+  REQUIRE_THAT(extractReal(output_buf),
+               Catch::Matchers::Approx(extractReal(expected))
+                   .margin(static_cast<float>(MARGIN)));
+  REQUIRE_THAT(extractImag(output_buf),
+               Catch::Matchers::Approx(extractImag(expected))
+                   .margin(static_cast<float>(MARGIN)));
+  auto reversed = fft(output_buf, true);
+  REQUIRE_THAT(extractReal(input_buf),
+               Catch::Matchers::Approx(extractReal(reversed))
+                   .margin(static_cast<float>(MARGIN)));
+  REQUIRE_THAT(extractImag(input_buf),
+               Catch::Matchers::Approx(extractImag(reversed))
+                   .margin(static_cast<float>(MARGIN)));
+}
 }  // namespace fftlib

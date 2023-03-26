@@ -1,12 +1,12 @@
 CONFIG?=Debug
-BUILD_DIR?=cmake-build
+BUILD_DIR?=build
 GENERATOR_OPTION?=-G "Ninja"
 
 configure:
 	cmake . -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=$(CONFIG) ${GENERATOR_OPTION} -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
-build:
-	make build-cpp
+configure-extra:
+	cmake . -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=$(CONFIG) ${GENERATOR_OPTION} -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DEXTRA_BENCH=ON
 
 build-cpp:
 	cmake --build $(BUILD_DIR) --config $(CONFIG)
@@ -31,11 +31,18 @@ test-python:
 test:
 	make test-python && make test-cpp
 
-.PHONY: benchmark
-benchmark: build-cpp
+.PHONY: bench
+bench: build-cpp
 	./${BUILD_DIR}/fftlib_benchmark "[!benchmark]"
+
+.PHONY: bench-extra
+bench-extra: build-cpp
+	./${BUILD_DIR}/fftlib_juce_benchmark_artefacts/${CONFIG}/fftlib_juce_benchmark "[!benchmark]"
 
 .PHONY: check-all
 check-all:
-	make lint && make test && make benchmark
+	make lint && make test && make bench
 
+.PHONY: check-all-extra
+check-all-extra:
+	make lint && make test && make bench && make bench-extra
