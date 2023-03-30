@@ -14,6 +14,6 @@ fi
 
 source $PYTHON_DIR/bin/activate
 
-pip install -U -q pip
-pip install -q -U -r $SCRIPT_DIR/requirements.txt
+pip install -U  pip
+pip install -U -r $SCRIPT_DIR/requirements.txt
 

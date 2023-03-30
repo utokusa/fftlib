@@ -3,5 +3,6 @@ scipy
 matplotlib
 pandas
 ipython
+pylint
 black
 
