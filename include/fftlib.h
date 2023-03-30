@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <cassert>
 #include <cmath>
 #include <complex>
 #include <iostream>
@@ -44,7 +45,8 @@ class Fft {
         n(static_cast<size_t>(std::pow(2, order))),
         index_bit_len(bitLength(n - 1)),
         w_arr(n),
-        w_arr_inverse(n) {
+        w_arr_inverse(n),
+        bit_reverse_arr(n / 2) {
     constexpr T pi = static_cast<T>(M_PI);
     for (size_t i = 0; i < n; i++) {
       std::complex<T> w_angle = {static_cast<T>(0.0),
@@ -52,6 +54,10 @@ class Fft {
                                      static_cast<T>(n) * static_cast<T>(i)};
       w_arr[i] = std::exp(w_angle);
       w_arr_inverse[i] = std::exp(w_angle * static_cast<T>(-1.0));
+
+      for (size_t i = 0; i < n / 2; i++) {
+        bit_reverse_arr[i] = reverseBits(i, index_bit_len);
+      }
     }
   }
   // Returns if success
@@ -88,9 +94,8 @@ class Fft {
           const auto idx = k0 - k0_start;
           const auto x0 = output_buf[k0];
           const auto x1 = output_buf[k1];
-          const size_t w_arr_idx = idx * num_group;
-          const std::complex<T> w =
-              inverse ? w_arr_inverse[w_arr_idx] : w_arr[w_arr_idx];
+          const std::complex<T> w = inverse ? wInverseCached(idx, num_group)
+                                            : wCached(idx, num_group);
           output_buf[k0] = x0 + x1;
           output_buf[k1] = w * (x0 - x1);
         }
@@ -105,7 +110,7 @@ class Fft {
 
     // Restore order of output using bit inversion
     for (size_t i = 0; i < n / 2; i++) {
-      auto j = reverseBits(i, index_bit_len);
+      auto j = reverseBitsCached(i);
       swap(output_buf[i], output_buf[j]);
     }
 
@@ -127,8 +132,27 @@ class Fft {
   const size_t order;
   const size_t n;
   const size_t index_bit_len;
+  // pre-calculated caches
   std::vector<std::complex<T>> w_arr;
   std::vector<std::complex<T>> w_arr_inverse;
+  std::vector<unsigned long> bit_reverse_arr;
+
+  inline std::complex<T> wCached(size_t idx, size_t num_group) {
+    const size_t w_arr_idx = idx * num_group;
+    assert(w_arr_idx < w_arr.size());
+    return w_arr[w_arr_idx];
+  }
+
+  inline std::complex<T> wInverseCached(size_t idx, size_t num_group) {
+    const size_t w_arr_idx = idx * num_group;
+    assert(w_arr_idx < w_arr_inverse.size());
+    return w_arr_inverse[w_arr_idx];
+  }
+
+  inline unsigned long reverseBitsCached(unsigned long x) {
+    assert(x < bit_reverse_arr.size());
+    return bit_reverse_arr[x];
+  }
 };
 
 }  // namespace fftlib
