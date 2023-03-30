@@ -36,81 +36,99 @@ unsigned long reverseBits(unsigned long x, unsigned long bit_length) {
   return rev;
 }
 
-// Returns if success
 template <class T>
-bool fft(const std::vector<std::complex<T>>& input_buf,
-         std::vector<std::complex<T>>& output_buf, bool inverse = false) {
-  constexpr bool SUCCESS = true;
-  auto n = input_buf.size();
-  if (n == 0 || !isPowerOfTwo(static_cast<int>(n)) || n != output_buf.size()) {
-    return !SUCCESS;
+class Fft {
+ public:
+  Fft(size_t order)
+      : order(order),
+        n(static_cast<size_t>(std::pow(2, order))),
+        index_bit_len(bitLength(n - 1)),
+        w_arr(n),
+        w_arr_inverse(n) {
+    constexpr T pi = static_cast<T>(M_PI);
+    for (size_t i = 0; i < n; i++) {
+      std::complex<T> w_angle = {static_cast<T>(0.0),
+                                 static_cast<T>(-1.0 * 2.0) * pi /
+                                     static_cast<T>(n) * static_cast<T>(i)};
+      w_arr[i] = std::exp(w_angle);
+      w_arr_inverse[i] = std::exp(w_angle * static_cast<T>(-1.0));
+    }
   }
+  // Returns if success
+  bool fft(const std::vector<std::complex<T>>& input_buf,
+           std::vector<std::complex<T>>& output_buf, bool inverse = false) {
+    constexpr bool SUCCESS = true;
+    if (n != input_buf.size() || n != output_buf.size()) {
+      return !SUCCESS;
+    }
 
-  // Copy input
-  for (size_t i = 0; i < n; i++) {
-    output_buf[i] = input_buf[i];
-  }
+    // Copy input
+    for (size_t i = 0; i < n; i++) {
+      output_buf[i] = input_buf[i];
+    }
 
-  if (n == 1) {
+    if (n == 1) {
+      return SUCCESS;
+    }
+
+    const auto num_loop = index_bit_len;
+
+    // Calculate FFT using butterfly operation
+    for (size_t i = 0; i < num_loop; i++) {
+      const auto num_group = static_cast<size_t>(std::pow(2, i));
+      const auto num_element_per_group = n / num_group;
+      for (size_t j = 0; j < num_group; j++) {
+        // k0: index for the first half of group
+        // k1: index for the second half of group
+        const auto k0_start = j * num_element_per_group;
+        const auto k0_end =
+            j * num_element_per_group + num_element_per_group / 2;  // exclusive
+        for (size_t k0 = k0_start; k0 < k0_end; k0++) {
+          const auto k1 = k0 + num_element_per_group / 2;
+          const auto idx = k0 - k0_start;
+          const auto x0 = output_buf[k0];
+          const auto x1 = output_buf[k1];
+          const size_t w_arr_idx = idx * num_group;
+          const std::complex<T> w =
+              inverse ? w_arr_inverse[w_arr_idx] : w_arr[w_arr_idx];
+          output_buf[k0] = x0 + x1;
+          output_buf[k1] = w * (x0 - x1);
+        }
+      }
+    }
+
+    // 'N' in textbook
+    T divisor = inverse ? static_cast<T>(n) : 1.0;
+    for (size_t i = 0; i < n; i++) {
+      output_buf[i] = output_buf[i] / divisor;
+    }
+
+    // Restore order of output using bit inversion
+    for (size_t i = 0; i < n / 2; i++) {
+      auto j = reverseBits(i, index_bit_len);
+      swap(output_buf[i], output_buf[j]);
+    }
+
     return SUCCESS;
   }
 
-  auto index_bit_len = bitLength(n - 1);
-  auto num_loop = index_bit_len;
-
-  // Calculate FFT using butterfly operation
-  for (size_t i = 0; i < num_loop; i++) {
-    auto num_group = static_cast<size_t>(std::pow(2, i));
-    auto num_element_per_group = n / num_group;
-    for (size_t j = 0; j < num_group; j++) {
-      // k0: index for the first half of group
-      // k1: index for the second half of group
-      auto k0_start = j * num_element_per_group;
-      auto k0_end =
-          j * num_element_per_group + num_element_per_group / 2;  // exclusive
-      for (size_t k0 = k0_start; k0 < k0_end; k0++) {
-        auto k1 = k0 + num_element_per_group / 2;
-        auto idx = k0 - k0_start;
-        auto x0 = output_buf[k0];
-        auto x1 = output_buf[k1];
-        auto angle_sign = static_cast<T>(inverse ? -1.0 : 1.0);
-        constexpr T pi = static_cast<T>(M_PI);
-        std::complex<T> w_angle = {static_cast<T>(0.0),
-                                   static_cast<T>(-1.0 * 2.0) * pi /
-                                       static_cast<T>(num_element_per_group) *
-                                       static_cast<T>(idx) * angle_sign};
-        std::complex<T> w = std::exp(w_angle);
-        output_buf[k0] = x0 + x1;
-        output_buf[k1] = w * (x0 - x1);
-      }
+  std::vector<std::complex<T>> fft(
+      const std::vector<std::complex<T>>& input_buf, bool inverse = false) {
+    auto n = input_buf.size();
+    std::vector<std::complex<T>> output_buf(n);
+    if (fft(input_buf, output_buf, inverse)) {
+      return output_buf;
+    } else {
+      return {};
     }
   }
 
-  // 'N' in textbook
-  T divisor = inverse ? static_cast<T>(n) : 1.0;
-  for (size_t i = 0; i < n; i++) {
-    output_buf[i] = output_buf[i] / divisor;
-  }
-
-  // Restore order of output using bit inversion
-  for (size_t i = 0; i < n / 2; i++) {
-    auto j = reverseBits(i, index_bit_len);
-    swap(output_buf[i], output_buf[j]);
-  }
-
-  return SUCCESS;
-}
-
-template <class T>
-std::vector<std::complex<T>> fft(const std::vector<std::complex<T>>& input_buf,
-                                 bool inverse = false) {
-  auto n = input_buf.size();
-  std::vector<std::complex<T>> output_buf(n);
-  if (fft(input_buf, output_buf, inverse)) {
-    return output_buf;
-  } else {
-    return {};
-  }
-}
+ private:
+  const size_t order;
+  const size_t n;
+  const size_t index_bit_len;
+  std::vector<std::complex<T>> w_arr;
+  std::vector<std::complex<T>> w_arr_inverse;
+};
 
 }  // namespace fftlib
