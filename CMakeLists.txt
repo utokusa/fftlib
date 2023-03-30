@@ -14,7 +14,7 @@ function(add_common_compile_option target_name)
   if(MSVC)
     target_compile_options(${target_name} PRIVATE /W4 /WX)
   else()
-    target_compile_options(${target_name} PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Werror)
+    target_compile_options(${target_name} PRIVATE -Wall -Wextra -Wpedantic -Werror)
   endif()
 endfunction()
 
