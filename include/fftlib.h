@@ -60,14 +60,11 @@ class Fft {
       }
     }
   }
-  // Returns if success
-  bool fft(const std::vector<std::complex<T>>& input_buf,
-           std::vector<std::complex<T>>& output_buf, bool inverse = false) {
-    constexpr bool SUCCESS = true;
-    if (n != input_buf.size() || n != output_buf.size()) {
-      return !SUCCESS;
-    }
 
+  // Returns if success
+  bool fft(const std::complex<T>* input_buf, std::complex<T>* output_buf,
+           bool inverse = false) {
+    constexpr bool SUCCESS = true;
     // Copy input
     for (size_t i = 0; i < n; i++) {
       output_buf[i] = input_buf[i];
@@ -115,6 +112,16 @@ class Fft {
     }
 
     return SUCCESS;
+  }
+
+  // Returns if success
+  bool fft(const std::vector<std::complex<T>>& input_buf,
+           std::vector<std::complex<T>>& output_buf, bool inverse = false) {
+    constexpr bool SUCCESS = true;
+    if (n != input_buf.size() || n != output_buf.size()) {
+      return !SUCCESS;
+    }
+    return fft(input_buf.data(), output_buf.data(), inverse);
   }
 
   std::vector<std::complex<T>> fft(

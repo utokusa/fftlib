@@ -53,37 +53,37 @@ TEST_CASE("fftlib benchmark (float)", "[!benchmark]") {
     std::vector<std::complex<float>> input_buf = genRandVec<float>(8);
     std::vector<std::complex<float>> output_buf(input_buf.size());
     Fft<float> fft(3);
-    meter.measure([&]() { fft.fft(input_buf, output_buf); });
+    meter.measure([&]() { fft.fft(input_buf.data(), output_buf.data()); });
   };
   BENCHMARK_ADVANCED("fft 32")(Catch::Benchmark::Chronometer meter) {
     std::vector<std::complex<float>> input_buf = genRandVec<float>(32);
     std::vector<std::complex<float>> output_buf(input_buf.size());
     Fft<float> fft(5);
-    meter.measure([&]() { fft.fft(input_buf, output_buf); });
+    meter.measure([&]() { fft.fft(input_buf.data(), output_buf.data()); });
   };
   BENCHMARK_ADVANCED("fft 64")(Catch::Benchmark::Chronometer meter) {
     std::vector<std::complex<float>> input_buf = genRandVec<float>(64);
     std::vector<std::complex<float>> output_buf(input_buf.size());
     Fft<float> fft(6);
-    meter.measure([&]() { fft.fft(input_buf, output_buf); });
+    meter.measure([&]() { fft.fft(input_buf.data(), output_buf.data()); });
   };
   BENCHMARK_ADVANCED("fft 512")(Catch::Benchmark::Chronometer meter) {
     std::vector<std::complex<float>> input_buf = genRandVec<float>(512);
     std::vector<std::complex<float>> output_buf(input_buf.size());
     Fft<float> fft(9);
-    meter.measure([&]() { fft.fft(input_buf, output_buf); });
+    meter.measure([&]() { fft.fft(input_buf.data(), output_buf.data()); });
   };
   BENCHMARK_ADVANCED("fft 1024")(Catch::Benchmark::Chronometer meter) {
     std::vector<std::complex<float>> input_buf = genRandVec<float>(1024);
     std::vector<std::complex<float>> output_buf(input_buf.size());
     Fft<float> fft(10);
-    meter.measure([&]() { fft.fft(input_buf, output_buf); });
+    meter.measure([&]() { fft.fft(input_buf.data(), output_buf.data()); });
   };
   BENCHMARK_ADVANCED("fft 8192")(Catch::Benchmark::Chronometer meter) {
     std::vector<std::complex<float>> input_buf = genRandVec<float>(8192);
     std::vector<std::complex<float>> output_buf(input_buf.size());
     Fft<float> fft(13);
-    meter.measure([&]() { fft.fft(input_buf, output_buf); });
+    meter.measure([&]() { fft.fft(input_buf.data(), output_buf.data()); });
   };
 }
 }  // namespace fftlib

@@ -173,7 +173,7 @@ TEST_CASE("FFT 6 (Non-power-of-two length)", "[fft]") {
                Catch::Matchers::Approx(extractImag(expected)).margin(MARGIN));
 }
 
-TEST_CASE("FFT 6 (float)", "[fft]") {
+TEST_CASE("FFT 7 (float)", "[fft]") {
   std::vector<std::complex<float>> input_buf{0, 1, 2, 3, 4, 5, 6, 7};
   Fft<float> fft(3);
   auto output_buf = fft.fft(input_buf);
@@ -194,5 +194,63 @@ TEST_CASE("FFT 6 (float)", "[fft]") {
   REQUIRE_THAT(extractImag(input_buf),
                Catch::Matchers::Approx(extractImag(reversed))
                    .margin(static_cast<float>(MARGIN)));
+}
+
+TEST_CASE("FFT 8 (Overload1)", "[fft]") {
+  std::vector<std::complex<double>> input_buf{0, 1, 2, 3, 4, 5, 6, 7};
+  std::vector<std::complex<double>> output_buf(input_buf.size());
+  Fft<double> fft(3);
+  REQUIRE(fft.fft(input_buf, output_buf));
+  // printVec(output_buf);
+  std::vector<std::complex<double>> expected{
+      {28, 0}, {-4, 9.65685},  {-4, 4},  {-4, 1.65685},
+      {-4, 0}, {-4, -1.65685}, {-4, -4}, {-4, -9.65685}};
+  REQUIRE_THAT(extractReal(output_buf),
+               Catch::Matchers::Approx(extractReal(expected)).margin(MARGIN));
+  REQUIRE_THAT(extractImag(output_buf),
+               Catch::Matchers::Approx(extractImag(expected)).margin(MARGIN));
+  std::vector<std::complex<double>> reversed(input_buf.size());
+  REQUIRE(fft.fft(output_buf, reversed, true));
+  REQUIRE_THAT(extractReal(input_buf),
+               Catch::Matchers::Approx(extractReal(reversed)).margin(MARGIN));
+  REQUIRE_THAT(extractImag(input_buf),
+               Catch::Matchers::Approx(extractImag(reversed)).margin(MARGIN));
+}
+
+TEST_CASE("FFT 9 (Overload2)", "[fft]") {
+  std::vector<std::complex<double>> input_buf{0, 1, 2, 3, 4, 5, 6, 7};
+  std::vector<std::complex<double>> output_buf(input_buf.size());
+  Fft<double> fft(3);
+  REQUIRE(fft.fft(input_buf.data(), output_buf.data()));
+  // printVec(output_buf);
+  std::vector<std::complex<double>> expected{
+      {28, 0}, {-4, 9.65685},  {-4, 4},  {-4, 1.65685},
+      {-4, 0}, {-4, -1.65685}, {-4, -4}, {-4, -9.65685}};
+  REQUIRE_THAT(extractReal(output_buf),
+               Catch::Matchers::Approx(extractReal(expected)).margin(MARGIN));
+  REQUIRE_THAT(extractImag(output_buf),
+               Catch::Matchers::Approx(extractImag(expected)).margin(MARGIN));
+  std::vector<std::complex<double>> reversed(input_buf.size());
+  REQUIRE(fft.fft(output_buf.data(), reversed.data(), true));
+  REQUIRE_THAT(extractReal(input_buf),
+               Catch::Matchers::Approx(extractReal(reversed)).margin(MARGIN));
+  REQUIRE_THAT(extractImag(input_buf),
+               Catch::Matchers::Approx(extractImag(reversed)).margin(MARGIN));
+}
+
+TEST_CASE("FFT 10 (Empty, Overload1)", "[fft]") {
+  std::vector<std::complex<double>> input_buf{};
+  std::vector<std::complex<double>> output_buf(input_buf.size());
+  Fft<double> fft(3);
+  REQUIRE_FALSE(fft.fft(input_buf, output_buf));
+  std::vector<std::complex<double>> reversed(input_buf.size());
+  REQUIRE_FALSE(fft.fft(output_buf, reversed, true));
+}
+
+TEST_CASE("FFT 11 (Non-power-of-two length, Overload1)", "[fft]") {
+  std::vector<std::complex<double>> input_buf{0, 1, 2};
+  std::vector<std::complex<double>> output_buf(input_buf.size());
+  Fft<double> fft(3);
+  REQUIRE_FALSE(fft.fft(input_buf, output_buf));
 }
 }  // namespace fftlib
