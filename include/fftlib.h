@@ -198,8 +198,18 @@ bool Fft<float>::fft(const std::complex<float>* input_buf,
         const auto x1 = output_buf[k1];
         const std::complex<float> w =
             inverse ? wInverseCached(idx, num_group) : wCached(idx, num_group);
-        output_buf[k0] = x0 + x1;
-        output_buf[k1] = w * (x0 - x1);
+        const auto xre0 = x0.real();
+        const auto xim0 = x0.imag();
+        const auto xre1 = x1.real();
+        const auto xim1 = x1.imag();
+        const auto wre = w.real();
+        const auto wim = w.imag();
+        const auto yre0 = xre0 + xre1;
+        const auto yim0 = xim0 + xim1;
+        const auto yre1 = wre * (xre0 - xre1) - wim * (xim0 - xim1);
+        const auto yim1 = wim * (xre0 - xre1) + wre * (xim0 - xim1);
+        output_buf[k0] = {yre0, yim0};  // x0 + x1
+        output_buf[k1] = {yre1, yim1};  // w * (x0 - x1)
       }
     }
   }
