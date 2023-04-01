@@ -48,16 +48,17 @@ class Fft {
         w_arr_inverse(n),
         bit_reverse_arr(n / 2) {
     constexpr T pi = static_cast<T>(M_PI);
+
     for (size_t i = 0; i < n; i++) {
       std::complex<T> w_angle = {static_cast<T>(0.0),
                                  static_cast<T>(-1.0 * 2.0) * pi /
                                      static_cast<T>(n) * static_cast<T>(i)};
       w_arr[i] = std::exp(w_angle);
       w_arr_inverse[i] = std::exp(w_angle * static_cast<T>(-1.0));
+    }
 
-      for (size_t i = 0; i < n / 2; i++) {
-        bit_reverse_arr[i] = reverseBits(i, index_bit_len);
-      }
+    for (size_t i = 0; i < n / 2; i++) {
+      bit_reverse_arr[i] = reverseBits(i, index_bit_len);
     }
   }
 
