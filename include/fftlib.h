@@ -44,12 +44,12 @@ class Fft {
       : order(order),
         n(static_cast<size_t>(std::pow(2, order))),
         index_bit_len(bitLength(n - 1)),
-        w_arr(n),
-        w_arr_inverse(n),
+        w_arr(n / 2),
+        w_arr_inverse(n / 2),
         bit_reverse_arr(n / 2) {
     constexpr T pi = static_cast<T>(M_PI);
 
-    for (size_t i = 0; i < n; i++) {
+    for (size_t i = 0; i < n / 2; i++) {
       std::complex<T> w_angle = {static_cast<T>(0.0),
                                  static_cast<T>(-1.0 * 2.0) * pi /
                                      static_cast<T>(n) * static_cast<T>(i)};
