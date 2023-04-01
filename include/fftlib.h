@@ -37,6 +37,7 @@ unsigned long reverseBits(unsigned long x, unsigned long bit_length) {
   return rev;
 }
 
+// FFT implementation with Sande–Tukey FFT algorithm (decimation in frequency)
 template <class T>
 class Fft {
  public:

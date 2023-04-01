@@ -58,7 +58,7 @@ def fft_simple(input_buf, inverse=False):
     return output_buf
 
 
-# Cooley–Tukey FFT algorithm
+# Sande–Tukey FFT algorithm (decimation in frequency)
 def fft(input_buf, inverse=False):
     n = len(input_buf)
     if n == 0:
