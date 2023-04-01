@@ -77,6 +77,7 @@ class Fft {
     }
 
     const auto num_loop = index_bit_len;
+    const auto& _w_arr = inverse ? w_arr_inverse : w_arr;
 
     // Calculate FFT using butterfly operation
     for (size_t i = 0; i < num_loop; i++) {
@@ -93,10 +94,19 @@ class Fft {
           const auto idx = k0 - k0_start;
           const auto x0 = output_buf[k0];
           const auto x1 = output_buf[k1];
-          const std::complex<T> w = inverse ? wInverseCached(idx, num_group)
-                                            : wCached(idx, num_group);
-          output_buf[k0] = x0 + x1;
-          output_buf[k1] = w * (x0 - x1);
+          const std::complex<T> w = _w_arr[idx * num_group];
+          const auto xre0 = x0.real();
+          const auto xim0 = x0.imag();
+          const auto xre1 = x1.real();
+          const auto xim1 = x1.imag();
+          const auto wre = w.real();
+          const auto wim = w.imag();
+          const auto yre0 = xre0 + xre1;
+          const auto yim0 = xim0 + xim1;
+          const auto yre1 = wre * (xre0 - xre1) - wim * (xim0 - xim1);
+          const auto yim1 = wim * (xre0 - xre1) + wre * (xim0 - xim1);
+          output_buf[k0] = {yre0, yim0};  // x0 + x1
+          output_buf[k1] = {yre1, yim1};  // w * (x0 - x1)
         }
       }
     }
@@ -147,86 +157,10 @@ class Fft {
   std::vector<std::complex<T>> w_arr_inverse;
   std::vector<unsigned long> bit_reverse_arr;
 
-  inline std::complex<T> wCached(size_t idx, size_t num_group) {
-    const size_t w_arr_idx = idx * num_group;
-    assert(w_arr_idx < w_arr.size());
-    return w_arr[w_arr_idx];
-  }
-
-  inline std::complex<T> wInverseCached(size_t idx, size_t num_group) {
-    const size_t w_arr_idx = idx * num_group;
-    assert(w_arr_idx < w_arr_inverse.size());
-    return w_arr_inverse[w_arr_idx];
-  }
-
   inline unsigned long reverseBitsCached(unsigned long x) {
     assert(x < bit_reverse_arr.size());
     return bit_reverse_arr[x];
   }
 };
-
-// Returns if success
-template <>
-bool Fft<float>::fft(const std::complex<float>* input_buf,
-                     std::complex<float>* output_buf, bool inverse) {
-  constexpr bool SUCCESS = true;
-  // Copy input
-  for (size_t i = 0; i < n; i++) {
-    output_buf[i] = input_buf[i];
-  }
-
-  if (n == 1) {
-    return SUCCESS;
-  }
-
-  const auto num_loop = index_bit_len;
-
-  // Calculate FFT using butterfly operation
-  for (size_t i = 0; i < num_loop; i++) {
-    const auto num_group = static_cast<size_t>(std::pow(2, i));
-    const auto num_element_per_group = n / num_group;
-    for (size_t j = 0; j < num_group; j++) {
-      // k0: index for the first half of group
-      // k1: index for the second half of group
-      const auto k0_start = j * num_element_per_group;
-      const auto k0_end =
-          j * num_element_per_group + num_element_per_group / 2;  // exclusive
-      for (size_t k0 = k0_start; k0 < k0_end; k0++) {
-        const auto k1 = k0 + num_element_per_group / 2;
-        const auto idx = k0 - k0_start;
-        const auto x0 = output_buf[k0];
-        const auto x1 = output_buf[k1];
-        const std::complex<float> w =
-            inverse ? wInverseCached(idx, num_group) : wCached(idx, num_group);
-        const auto xre0 = x0.real();
-        const auto xim0 = x0.imag();
-        const auto xre1 = x1.real();
-        const auto xim1 = x1.imag();
-        const auto wre = w.real();
-        const auto wim = w.imag();
-        const auto yre0 = xre0 + xre1;
-        const auto yim0 = xim0 + xim1;
-        const auto yre1 = wre * (xre0 - xre1) - wim * (xim0 - xim1);
-        const auto yim1 = wim * (xre0 - xre1) + wre * (xim0 - xim1);
-        output_buf[k0] = {yre0, yim0};  // x0 + x1
-        output_buf[k1] = {yre1, yim1};  // w * (x0 - x1)
-      }
-    }
-  }
-
-  // 'N' in textbook
-  float divisor = inverse ? static_cast<float>(n) : 1.0;
-  for (size_t i = 0; i < n; i++) {
-    output_buf[i] = output_buf[i] / divisor;
-  }
-
-  // Restore order of output using bit inversion
-  for (size_t i = 0; i < n / 2; i++) {
-    auto j = reverseBitsCached(i);
-    swap(output_buf[i], output_buf[j]);
-  }
-
-  return SUCCESS;
-}
 
 }  // namespace fftlib
