@@ -165,4 +165,58 @@ class Fft {
   }
 };
 
+// Returns if success
+template <>
+bool Fft<float>::fft(const std::complex<float>* input_buf,
+                     std::complex<float>* output_buf, bool inverse) {
+  constexpr bool SUCCESS = true;
+  // Copy input
+  for (size_t i = 0; i < n; i++) {
+    output_buf[i] = input_buf[i];
+  }
+
+  if (n == 1) {
+    return SUCCESS;
+  }
+
+  const auto num_loop = index_bit_len;
+
+  // Calculate FFT using butterfly operation
+  for (size_t i = 0; i < num_loop; i++) {
+    const auto num_group = static_cast<size_t>(std::pow(2, i));
+    const auto num_element_per_group = n / num_group;
+    for (size_t j = 0; j < num_group; j++) {
+      // k0: index for the first half of group
+      // k1: index for the second half of group
+      const auto k0_start = j * num_element_per_group;
+      const auto k0_end =
+          j * num_element_per_group + num_element_per_group / 2;  // exclusive
+      for (size_t k0 = k0_start; k0 < k0_end; k0++) {
+        const auto k1 = k0 + num_element_per_group / 2;
+        const auto idx = k0 - k0_start;
+        const auto x0 = output_buf[k0];
+        const auto x1 = output_buf[k1];
+        const std::complex<float> w =
+            inverse ? wInverseCached(idx, num_group) : wCached(idx, num_group);
+        output_buf[k0] = x0 + x1;
+        output_buf[k1] = w * (x0 - x1);
+      }
+    }
+  }
+
+  // 'N' in textbook
+  float divisor = inverse ? static_cast<float>(n) : 1.0;
+  for (size_t i = 0; i < n; i++) {
+    output_buf[i] = output_buf[i] / divisor;
+  }
+
+  // Restore order of output using bit inversion
+  for (size_t i = 0; i < n / 2; i++) {
+    auto j = reverseBitsCached(i);
+    swap(output_buf[i], output_buf[j]);
+  }
+
+  return SUCCESS;
+}
+
 }  // namespace fftlib
