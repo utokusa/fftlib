@@ -50,6 +50,7 @@ class Fft {
     constexpr T pi = static_cast<T>(M_PI);
 
     for (size_t i = 0; i < n / 2; i++) {
+      // Calculate twiddle factor ('W' in textbooks)
       std::complex<T> w_angle = {static_cast<T>(0.0),
                                  static_cast<T>(-1.0 * 2.0) * pi /
                                      static_cast<T>(n) * static_cast<T>(i)};
@@ -141,6 +142,7 @@ class Fft {
   const size_t n;
   const size_t index_bit_len;
   // pre-calculated caches
+  // Twiddle factor ('W' in textbooks)
   std::vector<std::complex<T>> w_arr;
   std::vector<std::complex<T>> w_arr_inverse;
   std::vector<unsigned long> bit_reverse_arr;
