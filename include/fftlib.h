@@ -37,7 +37,7 @@ unsigned long reverseBits(unsigned long x, unsigned long bit_length) {
   return rev;
 }
 
-// FFT implementation with Sande–Tukey FFT algorithm (decimation in frequency)
+// FFT implementation with Cooley–Tukey FFT algorithm (decimation in time)
 template <class T>
 class Fft {
  public:
@@ -47,7 +47,7 @@ class Fft {
         index_bit_len(bitLength(n - 1)),
         w_arr(n / 2),
         w_arr_inverse(n / 2),
-        bit_reverse_arr(n / 2) {
+        bit_reverse_arr(n) {
     constexpr T pi = static_cast<T>(M_PI);
 
     for (size_t i = 0; i < n / 2; i++) {
@@ -59,7 +59,7 @@ class Fft {
       w_arr_inverse[i] = std::exp(w_angle * static_cast<T>(-1.0));
     }
 
-    for (size_t i = 0; i < n / 2; i++) {
+    for (size_t i = 0; i < n; i++) {
       bit_reverse_arr[i] = reverseBits(i, index_bit_len);
     }
   }
@@ -68,9 +68,11 @@ class Fft {
   bool fft(const std::complex<T>* input_buf, std::complex<T>* output_buf,
            bool inverse = false) {
     constexpr bool SUCCESS = true;
-    // Copy input
+
+    // Copy input and reorder with bit inversion at the same time
     for (size_t i = 0; i < n; i++) {
-      output_buf[i] = input_buf[i];
+      auto j = reverseBitsCached(i);
+      output_buf[i] = input_buf[j];
     }
 
     if (n == 1) {
@@ -82,8 +84,10 @@ class Fft {
 
     // Calculate FFT using butterfly operation
     for (size_t i = 0; i < num_loop; i++) {
-      const auto num_group = static_cast<size_t>(std::pow(2, i));
-      const auto num_element_per_group = n / num_group;
+      const auto num_element_per_group =
+          static_cast<size_t>(std::pow(2, i + 1));
+      ;
+      const auto num_group = n / num_element_per_group;
       for (size_t j = 0; j < num_group; j++) {
         // k0: index for the first half of group
         // k1: index for the second half of group
@@ -102,12 +106,14 @@ class Fft {
           const auto xim1 = x1.imag();
           const auto wre = w.real();
           const auto wim = w.imag();
-          const auto yre0 = xre0 + xre1;
-          const auto yim0 = xim0 + xim1;
-          const auto yre1 = wre * (xre0 - xre1) - wim * (xim0 - xim1);
-          const auto yim1 = wim * (xre0 - xre1) + wre * (xim0 - xim1);
-          output_buf[k0] = {yre0, yim0};  // x0 + x1
-          output_buf[k1] = {yre1, yim1};  // w * (x0 - x1)
+          const auto wx1re = wre * xre1 - wim * xim1;
+          const auto wx1im = wim * xre1 + wre * xim1;
+          const auto yre0 = xre0 + wx1re;
+          const auto yim0 = xim0 + wx1im;
+          const auto yre1 = xre0 - wx1re;
+          const auto yim1 = xim0 - wx1im;
+          output_buf[k0] = {yre0, yim0};  // x0 + w * x1
+          output_buf[k1] = {yre1, yim1};  // x0 - w * x1
         }
       }
     }
@@ -116,12 +122,6 @@ class Fft {
     T divisor = inverse ? static_cast<T>(n) : 1.0;
     for (size_t i = 0; i < n; i++) {
       output_buf[i] = output_buf[i] / divisor;
-    }
-
-    // Restore order of output using bit inversion
-    for (size_t i = 0; i < n / 2; i++) {
-      auto j = reverseBitsCached(i);
-      swap(output_buf[i], output_buf[j]);
     }
 
     return SUCCESS;
