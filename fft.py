@@ -59,7 +59,7 @@ def fft_simple(input_buf, inverse=False):
 
 
 # Sande–Tukey FFT algorithm (decimation in frequency)
-def fft(input_buf, inverse=False):
+def fft_sande_tukey(input_buf, inverse=False):
     n = len(input_buf)
     if n == 0:
         raise ValueError("Input buffer is empty")
@@ -105,6 +105,58 @@ def fft(input_buf, inverse=False):
         j = reverse_bits(i, index_bit_len)
         # Swap
         output_buf[i], output_buf[j] = output_buf[j], output_buf[i]
+
+    return output_buf
+
+
+# Cooley–Tukey FFT algorithm (decimation in time)
+def fft(input_buf, inverse=False):
+    n = len(input_buf)
+    if n == 0:
+        raise ValueError("Input buffer is empty")
+
+    if not is_power_of_two(n):
+        raise ValueError("Input buffer length should be power of two")
+
+    if n == 1:
+        return input_buf
+
+    output_buf = np.zeros(n, dtype=np.complex128)
+    # Deep copy input
+    for i, x in enumerate(input_buf):
+        output_buf[i] = x
+
+    index_bit_len = bit_length(n - 1)
+    num_loop = index_bit_len
+
+    # Reorder of input using bit inversion
+    for i in range(n // 2):
+        j = reverse_bits(i, index_bit_len)
+        # Swap
+        output_buf[i], output_buf[j] = output_buf[j], output_buf[i]
+
+    # Calculate FFT using butterfly operation
+    for i in range(num_loop):
+        num_element_per_group = pow(2, i + 1)
+        num_group = n // num_element_per_group
+        for j in range(num_group):
+            # k0: index for the first half of group
+            # k1: index for the second half of group
+            k0_start = j * num_element_per_group
+            k0_end = j * num_element_per_group + num_element_per_group // 2  # exclusive
+            for k0 in range(k0_start, k0_end):
+                k1 = k0 + num_element_per_group // 2
+                idx = k0 - k0_start  # local index
+                x0 = output_buf[k0]
+                x1 = output_buf[k1]
+                angle_sign = -1 if inverse else 1
+                w_angle = -1 * 2 * np.pi / num_element_per_group * 1j * idx * angle_sign
+                w = np.exp(w_angle)  # 'W' in textbooks
+                output_buf[k0] = x0 + w * x1
+                output_buf[k1] = x0 - w * x1
+
+    divisor = n if inverse else 1  # 'N' in textbooks
+    output_buf = output_buf / divisor
 
     return output_buf
 
@@ -158,6 +210,7 @@ if __name__ == "__main__":
     assert reverse_bits(0b010, 3) == 0b010
 
     _test_fft_function(fft_simple)
+    _test_fft_function(fft_sande_tukey)
     _test_fft_function(fft)
 
     print("OK")
