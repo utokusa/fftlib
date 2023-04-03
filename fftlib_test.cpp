@@ -253,4 +253,134 @@ TEST_CASE("FFT 11 (Non-power-of-two length, Overload1)", "[fft]") {
   Fft<double> fft(3);
   REQUIRE_FALSE(fft.fft(input_buf, output_buf));
 }
+
+TEST_CASE("FFT 12 (length=32, double)", "[fft]") {
+  std::vector<std::complex<double>> input_buf{
+      0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15,
+      16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31};
+  Fft<double> fft(5);
+  auto output_buf = fft.fft(input_buf);
+  // printVec(output_buf);
+  std::vector<std::complex<double>> expected{{496.0, 0.0},
+                                             {-16.0, 162.45072620174176},
+                                             {-16.0, 80.43743187401357},
+                                             {-16.0, 52.744931343013135},
+                                             {-16.0, 38.62741699796952},
+                                             {-16.0, 29.933894588630228},
+                                             {-16.0, 23.945692202647823},
+                                             {-16.0, 19.49605640940762},
+                                             {-16.0, 16.0},
+                                             {-16.0, 13.130860653258562},
+                                             {-16.0, 10.690858206708779},
+                                             {-16.0, 8.55217817521266},
+                                             {-16.0, 6.627416997969522},
+                                             {-16.0, 4.853546937717486},
+                                             {-16.0, 3.1825978780745316},
+                                             {-16.0, 1.5758624537146204},
+                                             {-16.0, 0.0},
+                                             {-16.0, -1.5758624537146346},
+                                             {-16.0, -3.1825978780745316},
+                                             {-16.0, -4.853546937717471},
+                                             {-16.0, -6.627416997969522},
+                                             {-16.0, -8.55217817521267},
+                                             {-16.0, -10.690858206708779},
+                                             {-16.0, -13.130860653258555},
+                                             {-16.0, -16.0},
+                                             {-16.0, -19.496056409407625},
+                                             {-16.0, -23.945692202647823},
+                                             {-16.0, -29.93389458863023},
+                                             {-16.0, -38.62741699796952},
+                                             {-16.0, -52.744931343013135},
+                                             {-16.0, -80.43743187401357},
+                                             {-16.0, -162.45072620174176}};
+  REQUIRE_THAT(extractReal(output_buf),
+               Catch::Matchers::Approx(extractReal(expected)).margin(MARGIN));
+  REQUIRE_THAT(extractImag(output_buf),
+               Catch::Matchers::Approx(extractImag(expected)).margin(MARGIN));
+  auto reversed = fft.fft(output_buf, true);
+  REQUIRE_THAT(extractReal(input_buf),
+               Catch::Matchers::Approx(extractReal(reversed)).margin(MARGIN));
+  REQUIRE_THAT(extractImag(input_buf),
+               Catch::Matchers::Approx(extractImag(reversed)).margin(MARGIN));
+}
+
+TEST_CASE("FFT 13 (length=32, float)", "[fft]") {
+  std::vector<std::complex<float>> input_buf{
+      0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15,
+      16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31};
+  Fft<float> fft(5);
+  auto output_buf = fft.fft(input_buf);
+  // printVec(output_buf);
+  std::vector<std::complex<float>> expected{{496.0f, 0.0f},
+                                            {-16.0f, 162.45072620174176f},
+                                            {-16.0f, 80.43743187401357f},
+                                            {-16.0f, 52.744931343013135f},
+                                            {-16.0f, 38.62741699796952f},
+                                            {-16.0f, 29.933894588630228f},
+                                            {-16.0f, 23.945692202647823f},
+                                            {-16.0f, 19.49605640940762f},
+                                            {-16.0f, 16.0f},
+                                            {-16.0f, 13.130860653258562f},
+                                            {-16.0f, 10.690858206708779f},
+                                            {-16.0f, 8.55217817521266f},
+                                            {-16.0f, 6.627416997969522f},
+                                            {-16.0f, 4.853546937717486f},
+                                            {-16.0f, 3.1825978780745316f},
+                                            {-16.0f, 1.5758624537146204f},
+                                            {-16.0f, 0.0f},
+                                            {-16.0f, -1.5758624537146346f},
+                                            {-16.0f, -3.1825978780745316f},
+                                            {-16.0f, -4.853546937717471f},
+                                            {-16.0f, -6.627416997969522f},
+                                            {-16.0f, -8.55217817521267f},
+                                            {-16.0f, -10.690858206708779f},
+                                            {-16.0f, -13.130860653258555f},
+                                            {-16.0f, -16.0f},
+                                            {-16.0f, -19.496056409407625f},
+                                            {-16.0f, -23.945692202647823f},
+                                            {-16.0f, -29.93389458863023f},
+                                            {-16.0f, -38.62741699796952f},
+                                            {-16.0f, -52.744931343013135f},
+                                            {-16.0f, -80.43743187401357f},
+                                            {-16.0f, -162.45072620174176f}};
+  REQUIRE_THAT(extractReal(output_buf),
+               Catch::Matchers::Approx(extractReal(expected)).margin(MARGIN));
+  REQUIRE_THAT(extractImag(output_buf),
+               Catch::Matchers::Approx(extractImag(expected)).margin(MARGIN));
+  auto reversed = fft.fft(output_buf, true);
+  REQUIRE_THAT(extractReal(input_buf),
+               Catch::Matchers::Approx(extractReal(reversed)).margin(MARGIN));
+  REQUIRE_THAT(extractImag(input_buf),
+               Catch::Matchers::Approx(extractImag(reversed)).margin(MARGIN));
+}
+
+TEST_CASE("FFT 14 (large array, double)", "[fft]") {
+  std::vector<std::complex<double>> input_buf(512);  // 2 ** 9 = 512
+  // Create large array with some values
+  for (size_t i = 0; i < input_buf.size(); i++) {
+    input_buf[i] = static_cast<double>(i) - 256.0;
+  }
+  Fft<double> fft(9);
+  auto output_buf = fft.fft(input_buf);
+  auto reversed = fft.fft(output_buf, true);
+  REQUIRE_THAT(extractReal(input_buf),
+               Catch::Matchers::Approx(extractReal(reversed)).margin(MARGIN));
+  REQUIRE_THAT(extractImag(input_buf),
+               Catch::Matchers::Approx(extractImag(reversed)).margin(MARGIN));
+}
+
+TEST_CASE("FFT 15 (large array, float)", "[fft]") {
+  std::vector<std::complex<float>> input_buf(512);  // 2 ** 9 = 512
+  // Create large array with some values
+  for (size_t i = 0; i < input_buf.size(); i++) {
+    input_buf[i] = static_cast<float>(i) - 256.0;
+  }
+  Fft<float> fft(9);
+  auto output_buf = fft.fft(input_buf);
+  auto reversed = fft.fft(output_buf, true);
+  REQUIRE_THAT(extractReal(input_buf),
+               Catch::Matchers::Approx(extractReal(reversed)).margin(MARGIN));
+  REQUIRE_THAT(extractImag(input_buf),
+               Catch::Matchers::Approx(extractImag(reversed)).margin(MARGIN));
+}
 }  // namespace fftlib

@@ -101,10 +101,11 @@ def fft_sande_tukey(input_buf, inverse=False):
     output_buf = output_buf / divisor
 
     # Restore order of output using bit inversion
-    for i in range(n // 2):
+    for i in range(n):
         j = reverse_bits(i, index_bit_len)
-        # Swap
-        output_buf[i], output_buf[j] = output_buf[j], output_buf[i]
+        if i < j:
+            # Swap
+            output_buf[i], output_buf[j] = output_buf[j], output_buf[i]
 
     return output_buf
 
@@ -130,10 +131,11 @@ def fft(input_buf, inverse=False):
     num_loop = index_bit_len
 
     # Reorder of input using bit inversion
-    for i in range(n // 2):
+    for i in range(n):
         j = reverse_bits(i, index_bit_len)
-        # Swap
-        output_buf[i], output_buf[j] = output_buf[j], output_buf[i]
+        if i < j:
+            # Swap
+            output_buf[i], output_buf[j] = output_buf[j], output_buf[i]
 
     # Calculate FFT using butterfly operation
     for i in range(num_loop):
@@ -166,7 +168,7 @@ def _check_fft_result(fft_func, input_buf):
     output_buf = fft_func(input_buf)
     output_np = np.fft.fft(input_buf)
     assert np.allclose(output_buf, output_np), (
-        test_case_str + f": {output_buf}, {output_np}"
+        test_case_str + f":\n{output_buf},\n{output_np}"
     )
     assert np.allclose(fft_func(output_buf, True), np.fft.ifft(output_np)), (
         test_case_str + f": {fft_func(output_buf, True)}, {np.fft.ifft(output_np)}"
@@ -194,6 +196,20 @@ def _test_fft_function(fft_func):
     _check_fft_result(fft_func, np.array([0, 1, 2, 3]))
     _check_fft_result(fft_func, np.array([1, 1]))
     _check_fft_result(fft_func, np.array([1]))
+    _check_fft_result(fft_func, np.array(range(32)))
+    # Just some random large array
+    _check_fft_result(fft_func, np.array(range(512)) - 256)
+
+
+# Print complex array in a format which is easy to use in C++
+# If you want to use for std::complex<float>, use suffix="f"
+def _print_complex_arr_cpp_format(arr, suffix=""):
+    print("{", end="")
+    for i, x in enumerate(arr):
+        print("{", end="")
+        print(f"{x.real}{suffix}, {x.imag}{suffix}", end="")
+        print("}" + ("" if i == len(arr) - 1 else ", "), end="")
+    print("}")
 
 
 if __name__ == "__main__":
@@ -201,16 +217,26 @@ if __name__ == "__main__":
     assert bit_length(0) == 0
     assert bit_length(1) == 1
     assert bit_length(2) == 2
+    assert bit_length(3) == 2
     assert bit_length(4) == 3
+    assert bit_length(7) == 3
     assert bit_length(8) == 4
+    assert bit_length(31) == 5
+    assert bit_length(32) == 6
 
     assert reverse_bits(0b000, 3) == 0b000
     assert reverse_bits(0b001, 3) == 0b100
     assert reverse_bits(0b011, 3) == 0b110
     assert reverse_bits(0b010, 3) == 0b010
+    assert reverse_bits(0b01001, 5) == 0b10010
 
     _test_fft_function(fft_simple)
     _test_fft_function(fft_sande_tukey)
     _test_fft_function(fft)
+
+    # Use following to add new test cases to C++ code
+    # _print_complex_arr_cpp_format(np.fft.fft(np.array(range(32))), "f")
+    # _print_complex_arr_cpp_format(np.fft.fft(np.array(range(32))))
+    # _print_complex_arr_cpp_format(np.array(range(32)), ".")
 
     print("OK")
