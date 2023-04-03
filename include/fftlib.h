@@ -100,20 +100,20 @@ class Fft {
           const auto x0 = output_buf[k0];
           const auto x1 = output_buf[k1];
           const std::complex<T> w = _w_arr[idx * num_group];
-          const auto xre0 = x0.real();
-          const auto xim0 = x0.imag();
-          const auto xre1 = x1.real();
-          const auto xim1 = x1.imag();
-          const auto wre = w.real();
-          const auto wim = w.imag();
-          const auto wx1re = wre * xre1 - wim * xim1;
-          const auto wx1im = wim * xre1 + wre * xim1;
-          const auto yre0 = xre0 + wx1re;
-          const auto yim0 = xim0 + wx1im;
-          const auto yre1 = xre0 - wx1re;
-          const auto yim1 = xim0 - wx1im;
-          output_buf[k0] = {yre0, yim0};  // x0 + w * x1
-          output_buf[k1] = {yre1, yim1};  // x0 - w * x1
+          const auto x0_re = x0.real();
+          const auto x0_im = x0.imag();
+          const auto x1_re = x1.real();
+          const auto x1_im = x1.imag();
+          const auto w_re = w.real();
+          const auto w_im = w.imag();
+          const auto wx1_re = w_re * x1_re - w_im * x1_im;
+          const auto wx1_im = w_im * x1_re + w_re * x1_im;
+          const auto y0_re = x0_re + wx1_re;
+          const auto y0_im = x0_im + wx1_im;
+          const auto y1_re = x0_re - wx1_re;
+          const auto y1_im = x0_im - wx1_im;
+          output_buf[k0] = {y0_re, y0_im};  // x0 + w * x1
+          output_buf[k1] = {y1_re, y1_im};  // x0 - w * x1
         }
       }
     }
