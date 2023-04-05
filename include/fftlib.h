@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <xmmintrin.h>
+
 #include <cassert>
 #include <cmath>
 #include <complex>
@@ -174,6 +176,8 @@ class Fft<float> {
         index_bit_len(bitLength(n - 1)),
         w_arr(n / 2),
         w_arr_inverse(n / 2),
+        w_arr_split(n / 2),
+        w_arr_inverse_split(n / 2),
         bit_reverse_arr(n) {
     constexpr float pi = static_cast<float>(M_PI);
 
@@ -185,6 +189,14 @@ class Fft<float> {
                                          static_cast<float>(i)};
       w_arr[i] = std::exp(w_angle);
       w_arr_inverse[i] = std::exp(w_angle * static_cast<float>(-1.0));
+      w_arr_split[i] = std::exp(w_angle);
+      w_arr_inverse_split[i] = std::exp(w_angle * static_cast<float>(-1.0));
+    }
+
+    for (size_t i = 0; i + 3 < n / 2; i += 4) {
+      split4complexNumsToReIm(reinterpret_cast<float*>(&w_arr_split[i]));
+      split4complexNumsToReIm(
+          reinterpret_cast<float*>(&w_arr_inverse_split[i]));
     }
 
     for (size_t i = 0; i < n; i++) {
@@ -209,6 +221,7 @@ class Fft<float> {
 
     const auto num_loop = index_bit_len;
     const auto& _w_arr = inverse ? w_arr_inverse : w_arr;
+    auto& _w_arr_split = inverse ? w_arr_inverse_split : w_arr_split;
 
     // Calculate FFfloat using butterfly operation
     for (size_t i = 0; i < num_loop; i++) {
@@ -216,32 +229,87 @@ class Fft<float> {
           static_cast<size_t>(std::pow(2, i + 1));
       ;
       const auto num_group = n / num_element_per_group;
-      for (size_t j = 0; j < num_group; j++) {
-        // k0: index for the first half of group
-        // k1: index for the second half of group
-        const auto k0_start = j * num_element_per_group;
-        const auto k0_end =
-            j * num_element_per_group + num_element_per_group / 2;  // exclusive
-        for (size_t k0 = k0_start; k0 < k0_end; k0++) {
-          const auto k1 = k0 + num_element_per_group / 2;
-          const auto idx = k0 - k0_start;
-          const auto x0 = output_buf[k0];
-          const auto x1 = output_buf[k1];
-          const std::complex<float> w = _w_arr[idx * num_group];
-          const auto x0_re = x0.real();
-          const auto x0_im = x0.imag();
-          const auto x1_re = x1.real();
-          const auto x1_im = x1.imag();
-          const auto w_re = w.real();
-          const auto w_im = w.imag();
-          const auto wx1_re = w_re * x1_re - w_im * x1_im;
-          const auto wx1_im = w_im * x1_re + w_re * x1_im;
-          const auto y0_re = x0_re + wx1_re;
-          const auto y0_im = x0_im + wx1_im;
-          const auto y1_re = x0_re - wx1_re;
-          const auto y1_im = x0_im - wx1_im;
-          output_buf[k0] = {y0_re, y0_im};  // x0 + w * x1
-          output_buf[k1] = {y1_re, y1_im};  // x0 - w * x1
+      if (num_element_per_group <= 4) {
+        // Do FFT normally
+        for (size_t j = 0; j < num_group; j++) {
+          // k0: index for the first half of group
+          // k1: index for the second half of group
+          const auto k0_start = j * num_element_per_group;
+          const auto k0_end = j * num_element_per_group +
+                              num_element_per_group / 2;  // exclusive
+          for (size_t k0 = k0_start; k0 < k0_end; k0++) {
+            const auto k1 = k0 + num_element_per_group / 2;
+            const auto idx = k0 - k0_start;
+            const auto x0 = output_buf[k0];
+            const auto x1 = output_buf[k1];
+            const std::complex<float> w = _w_arr[idx * num_group];
+            const auto x0_re = x0.real();
+            const auto x0_im = x0.imag();
+            const auto x1_re = x1.real();
+            const auto x1_im = x1.imag();
+            const auto w_re = w.real();
+            const auto w_im = w.imag();
+            const auto wx1_re = w_re * x1_re - w_im * x1_im;
+            const auto wx1_im = w_im * x1_re + w_re * x1_im;
+            const auto y0_re = x0_re + wx1_re;
+            const auto y0_im = x0_im + wx1_im;
+            const auto y1_re = x0_re - wx1_re;
+            const auto y1_im = x0_im - wx1_im;
+            output_buf[k0] = {y0_re, y0_im};  // x0 + w * x1
+            output_buf[k1] = {y1_re, y1_im};  // x0 - w * x1
+          }
+        }
+      } else {
+        // Do SIMD FFT
+        for (size_t j = 0; j < num_group; j++) {
+          // k0: index for the first half of group
+          // k1: index for the second half of group
+          const auto k0_start = j * num_element_per_group;
+          const auto k0_end = j * num_element_per_group +
+                              num_element_per_group / 2;  // exclusive
+          for (size_t k0 = k0_start; k0 < k0_end; k0 += 4) {
+            const auto k1 = k0 + num_element_per_group / 2;
+            const auto idx = k0 - k0_start;
+            if (num_element_per_group == 8) {
+              float* out_split_k0 = reinterpret_cast<float*>(&output_buf[k0]);
+              split4complexNumsToReIm(out_split_k0);
+              float* out_split_k1 = reinterpret_cast<float*>(&output_buf[k1]);
+              split4complexNumsToReIm(out_split_k1);
+            }
+            __m128 x0_re =
+                _mm_load_ps(reinterpret_cast<float*>(&output_buf[k0]));
+            __m128 x0_im =
+                _mm_load_ps(reinterpret_cast<float*>(&output_buf[k0 + 2]));
+            __m128 x1_re =
+                _mm_load_ps(reinterpret_cast<float*>(&output_buf[k1]));
+            __m128 x1_im =
+                _mm_load_ps(reinterpret_cast<float*>(&output_buf[k1 + 2]));
+            __m128 w_re = _mm_load_ps(
+                reinterpret_cast<float*>(&_w_arr_split[idx * num_group]));
+            __m128 w_im = _mm_load_ps(
+                reinterpret_cast<float*>(&_w_arr_split[idx * num_group + 2]));
+            __m128 wx1_re = _mm_sub_ps(
+                _mm_mul_ps(w_re, x1_re),
+                _mm_mul_ps(w_im, x1_im));  // w_re * x1_re - w_im * x1_im
+            __m128 wx1_im = _mm_add_ps(
+                _mm_mul_ps(w_im, x1_re),
+                _mm_mul_ps(w_re, x1_im));  // w_im * x1_re + w_re * x1_im
+            __m128 y0_re = _mm_add_ps(x0_re, wx1_re);  // x0_re + wx1_re
+            __m128 y0_im = _mm_add_ps(x0_im, wx1_im);  // x0_im + wx1_im
+            __m128 y1_re = _mm_sub_ps(x0_re, wx1_re);  // x0_re - wx1_re
+            __m128 y1_im = _mm_sub_ps(x0_im, wx1_im);  // x0_im - wx1_im
+            _mm_store_ps(reinterpret_cast<float*>(&output_buf[k0]), y0_re);
+            _mm_store_ps(reinterpret_cast<float*>(&output_buf[k0 + 2]), y0_im);
+            _mm_store_ps(reinterpret_cast<float*>(&output_buf[k1]), y1_re);
+            _mm_store_ps(reinterpret_cast<float*>(&output_buf[k1 + 2]), y1_im);
+            if (i == num_loop - 1 && num_element_per_group >= 8) {
+              // Redo splitting real and imag
+              float* out_split_k0 = reinterpret_cast<float*>(&output_buf[k0]);
+              redoSplit4complexNumsToReIm(out_split_k0);
+              float* out_split_k1 = reinterpret_cast<float*>(&output_buf[k1]);
+              redoSplit4complexNumsToReIm(out_split_k1);
+            }
+          }
         }
       }
     }
@@ -283,11 +351,45 @@ class Fft<float> {
   // floatwiddle factor ('W' in textbooks)
   std::vector<std::complex<float>> w_arr;
   std::vector<std::complex<float>> w_arr_inverse;
+  std::vector<std::complex<float>> w_arr_split;
+  std::vector<std::complex<float>> w_arr_inverse_split;
   std::vector<unsigned long> bit_reverse_arr;
 
   inline unsigned long reverseBitsCached(unsigned long x) {
     assert(x < bit_reverse_arr.size());
     return bit_reverse_arr[x];
+  }
+
+  static inline void split4complexNumsToReIm(float* buf) {
+    // Split real and imag
+    // [re0,im0,re1,im1,re2,im2,re3,im3] -> [re0,re1,re2,re3,im0,im1,im2,im3]
+    //      ^   ^
+    std::swap(buf[1], buf[2]);
+    // [re0,re1,im0,im1,re2,im2,re3,im3]
+    //          ^       ^
+    std::swap(buf[2], buf[4]);
+    // [re0,re1,re2,im1,im0,im2,re3,im3]
+    //              ^           ^
+    std::swap(buf[3], buf[6]);
+    // [re0,re1,re2,re3,im0,im2,im1,im3]
+    //                      ^   ^
+    std::swap(buf[5], buf[6]);
+  }
+
+  static inline void redoSplit4complexNumsToReIm(float* buf) {
+    // Split real and imag
+    // [re0,re1,re2,re3,im0,im1,im2,im3] -> [re0,im0,re1,im1,re2,im2,re3,im3]
+    //      ^           ^
+    std::swap(buf[1], buf[4]);
+    // [re0,im0,re2,re3,re1,im1,im2,im3]
+    //          ^       ^
+    std::swap(buf[2], buf[4]);
+    // [re0,im0,re1,re3,re2,im1,im2,im3]
+    //              ^       ^
+    std::swap(buf[3], buf[5]);
+    // [re0,im0,re1,im1,re2,re3,im2,im3]
+    //                      ^   ^
+    std::swap(buf[5], buf[6]);
   }
 };
 
