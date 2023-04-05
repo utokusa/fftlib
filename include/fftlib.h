@@ -10,9 +10,11 @@
 
 #include <xmmintrin.h>
 
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <complex>
+#include <iomanip>
 #include <iostream>
 #include <vector>
 
@@ -38,6 +40,24 @@ unsigned long reverseBits(unsigned long x, unsigned long bit_length) {
   }
   return rev;
 }
+
+template <class T>
+std::complex<T> twiddleFactor(int x, size_t n) {
+  constexpr T pi = static_cast<T>(M_PI);
+  std::complex<T> w_angle = {
+      static_cast<T>(0.0),
+      static_cast<T>(-1.0 * 2.0) * pi / static_cast<T>(n) * static_cast<T>(x)};
+  return std::exp(w_angle);
+}
+
+// template <class T>
+// void printVec(T* vec, size_t n) {
+//   for (size_t i = 0; i < n; i++) {
+//     std::cout << std::fixed << std::setw(7) << std::setprecision(2)
+//               << std::right;
+//     std::cout << vec[i] << (i + 1 < n ? "," : "\n");
+//   }
+// }
 
 // FFT implementation with Cooley–Tukey FFT algorithm (decimation in time)
 template <class T>
@@ -176,8 +196,8 @@ class Fft<float> {
         index_bit_len(bitLength(n - 1)),
         w_arr(n / 2),
         w_arr_inverse(n / 2),
-        w_arr_split(n / 2),
-        w_arr_inverse_split(n / 2),
+        w_arr_split(),
+        w_arr_inverse_split(),
         bit_reverse_arr(n) {
     constexpr float pi = static_cast<float>(M_PI);
 
@@ -189,14 +209,40 @@ class Fft<float> {
                                          static_cast<float>(i)};
       w_arr[i] = std::exp(w_angle);
       w_arr_inverse[i] = std::exp(w_angle * static_cast<float>(-1.0));
-      w_arr_split[i] = std::exp(w_angle);
-      w_arr_inverse_split[i] = std::exp(w_angle * static_cast<float>(-1.0));
     }
 
-    for (size_t i = 0; i + 3 < n / 2; i += 4) {
-      split4complexNumsToReIm(reinterpret_cast<float*>(&w_arr_split[i]));
-      split4complexNumsToReIm(
-          reinterpret_cast<float*>(&w_arr_inverse_split[i]));
+    const auto num_loop = index_bit_len;
+    for (size_t i = 0; i < num_loop; i++) {
+      const auto num_element_per_group =
+          static_cast<size_t>(std::pow(2, i + 1));
+      ;
+      const auto num_group = n / num_element_per_group;
+      const int num_paralell = 4;
+      w_arr_split.emplace_back();
+      w_arr_inverse_split.emplace_back();
+      for (size_t idx = 0; idx < num_element_per_group / 2;
+           idx += num_paralell) {
+        w_arr_split.back().emplace_back();
+        auto& w_slot = w_arr_split.back().back();
+        w_slot[0] = twiddleFactor<float>((idx + 0) * num_group, n).real();
+        w_slot[1] = twiddleFactor<float>((idx + 1) * num_group, n).real();
+        w_slot[2] = twiddleFactor<float>((idx + 2) * num_group, n).real();
+        w_slot[3] = twiddleFactor<float>((idx + 3) * num_group, n).real();
+        w_slot[4] = twiddleFactor<float>((idx + 0) * num_group, n).imag();
+        w_slot[5] = twiddleFactor<float>((idx + 1) * num_group, n).imag();
+        w_slot[6] = twiddleFactor<float>((idx + 2) * num_group, n).imag();
+        w_slot[7] = twiddleFactor<float>((idx + 3) * num_group, n).imag();
+        w_arr_inverse_split.back().emplace_back();
+        auto& wi_slot = w_arr_inverse_split.back().back();
+        wi_slot[0] = twiddleFactor<float>(-1 * (idx + 0) * num_group, n).real();
+        wi_slot[1] = twiddleFactor<float>(-1 * (idx + 1) * num_group, n).real();
+        wi_slot[2] = twiddleFactor<float>(-1 * (idx + 2) * num_group, n).real();
+        wi_slot[3] = twiddleFactor<float>(-1 * (idx + 3) * num_group, n).real();
+        wi_slot[4] = twiddleFactor<float>(-1 * (idx + 0) * num_group, n).imag();
+        wi_slot[5] = twiddleFactor<float>(-1 * (idx + 1) * num_group, n).imag();
+        wi_slot[6] = twiddleFactor<float>(-1 * (idx + 2) * num_group, n).imag();
+        wi_slot[7] = twiddleFactor<float>(-1 * (idx + 3) * num_group, n).imag();
+      }
     }
 
     for (size_t i = 0; i < n; i++) {
@@ -284,10 +330,13 @@ class Fft<float> {
                 _mm_load_ps(reinterpret_cast<float*>(&output_buf[k1]));
             __m128 x1_im =
                 _mm_load_ps(reinterpret_cast<float*>(&output_buf[k1 + 2]));
+            constexpr int num_parallel = 4;
+            const int iteration_count = idx / num_parallel;
             __m128 w_re = _mm_load_ps(
-                reinterpret_cast<float*>(&_w_arr_split[idx * num_group]));
+                reinterpret_cast<float*>(&_w_arr_split[i][iteration_count]));
             __m128 w_im = _mm_load_ps(
-                reinterpret_cast<float*>(&_w_arr_split[idx * num_group + 2]));
+                reinterpret_cast<float*>(&_w_arr_split[i][iteration_count]) +
+                4 /*offset to imag*/);
             __m128 wx1_re = _mm_sub_ps(
                 _mm_mul_ps(w_re, x1_re),
                 _mm_mul_ps(w_im, x1_im));  // w_re * x1_re - w_im * x1_im
@@ -351,8 +400,9 @@ class Fft<float> {
   // floatwiddle factor ('W' in textbooks)
   std::vector<std::complex<float>> w_arr;
   std::vector<std::complex<float>> w_arr_inverse;
-  std::vector<std::complex<float>> w_arr_split;
-  std::vector<std::complex<float>> w_arr_inverse_split;
+  std::vector<std::vector<std::array<float, 8 /*for 4 float complex number*/>>>
+      w_arr_split;
+  std::vector<std::vector<std::array<float, 8>>> w_arr_inverse_split;
   std::vector<unsigned long> bit_reverse_arr;
 
   inline unsigned long reverseBitsCached(unsigned long x) {
