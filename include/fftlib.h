@@ -376,7 +376,7 @@ class Fft<float> {
           const auto k0_start = j * num_element_per_group;
           const auto k0_end = j * num_element_per_group +
                               num_element_per_group / 2;  // exclusive
-          for (size_t k0 = k0_start; k0 < k0_end; k0 += 4) {
+          for (size_t k0 = k0_start; k0 < k0_end; k0 += SIMD_WIDTH) {
             const auto k1 = k0 + num_element_per_group / 2;
             const auto idx = k0 - k0_start;
             float4 x0_re;
