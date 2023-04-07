@@ -10,6 +10,8 @@
 
 #ifdef __SSE__
 #include <xmmintrin.h>
+#elif defined(__ARM_NEON)
+#include <arm_neon.h>
 #endif
 
 #include <array>
@@ -21,6 +23,63 @@
 #include <vector>
 
 namespace fftlib {
+
+// SIMD
+#if defined(__SSE__)
+#define SIMD_SUPPORT
+typedef __m128 float4;
+#define FLOAT4_LOAD(p) _mm_load_ps(p)
+#define FLOAT4_STORE(p, v) _mm_store_ps(p, v)
+#define FLOAT4_ADD(a, b) _mm_add_ps(a, b)
+#define FLOAT4_SUB(a, b) _mm_sub_ps(a, b)
+#define FLOAT4_MUL(a, b) _mm_mul_ps(a, b)
+// Split interleaved complex array to real array and imag array
+// [re0,im0,re1,im1,re2,im2,re3,im3] ->
+//  ^ src_lo         ^ src_hi
+// [re0,re1,re2,re3,im0,im1,im2,im3]
+//  ^ dst_re         ^ dst_im
+#define FLOAT4_SPLIT_REAL_IMAG(dst_re, dst_im, src_lo, src_hi)    \
+  dst_re = _mm_shuffle_ps(x0_lo, x0_hi, _MM_SHUFFLE(2, 0, 2, 0)); \
+  dst_im = _mm_shuffle_ps(x0_lo, x0_hi, _MM_SHUFFLE(3, 1, 3, 1));
+// Interleave (redo splitting) real and imag
+// [re0,re1,re2,re3,im0,im1,im2,im3] ->
+//  ^ y0_re         ^ y0_im
+// [re0,im0,re1,im1,re2,im2,re3,im3]
+//  ^ y0_lo         ^ y0_hi
+#define FLOAT4_INTERLEAVE_REAL_IMAG(dst_lo, dst_hi, src_re, src_im) \
+  dst_lo = _mm_unpacklo_ps(src_re, src_im);                         \
+  dst_hi = _mm_unpackhi_ps(src_re, src_im);
+#elif defined(__ARM_NEON)
+#define SIMD_SUPPORT
+typedef float32x4_t float4;
+#define FLOAT4_LOAD(p) vld1q_f32(p)
+#define FLOAT4_STORE(p, v) vst1q_f32(p, v)
+#define FLOAT4_ADD(a, b) vaddq_f32(a, b)
+#define FLOAT4_SUB(a, b) vsubq_f32(a, b)
+#define FLOAT4_MUL(a, b) vmulq_f32(a, b)
+// Split interleaved complex array to real array and imag array
+// [re0,im0,re1,im1,re2,im2,re3,im3] ->
+//  ^ src_lo         ^ src_hi
+// [re0,re1,re2,re3,im0,im1,im2,im3]
+//  ^ dst_re         ^ dst_im
+#define FLOAT4_SPLIT_REAL_IMAG(dst_re, dst_im, src_lo, src_hi) \
+  {                                                            \
+    float32x4x2_t unziped = vuzpq_f32(src_lo, src_hi);         \
+    dst_re = unziped.val[0];                                   \
+    dst_im = unziped.val[1];                                   \
+  }
+// Interleave (redo splitting) real and imag
+// [re0,re1,re2,re3,im0,im1,im2,im3] ->
+//  ^ y0_re         ^ y0_im
+// [re0,im0,re1,im1,re2,im2,re3,im3]
+//  ^ y0_lo         ^ y0_hi
+#define FLOAT4_INTERLEAVE_REAL_IMAG(dst_lo, dst_hi, src_re, src_im) \
+  {                                                                 \
+    float32x4x2_t ziped = vzipq_f32(src_re, src_im);                \
+    dst_lo = ziped.val[0];                                          \
+    dst_hi = ziped.val[1];                                          \
+  }
+#endif
 
 bool isPowerOfTwo(int x) { return (x & (x - 1)) == 0; }
 
@@ -188,7 +247,7 @@ class Fft {
   }
 };
 
-#ifdef __SSE__
+#ifdef SIMD_SUPPORT
 // FFfloat implementation with Cooley–floatukey FFfloat algorithm (decimation in
 // time)
 template <>
@@ -319,75 +378,75 @@ class Fft<float> {
           for (size_t k0 = k0_start; k0 < k0_end; k0 += 4) {
             const auto k1 = k0 + num_element_per_group / 2;
             const auto idx = k0 - k0_start;
-            __m128 x0_re;
-            __m128 x0_im;
-            __m128 x1_re;
-            __m128 x1_im;
+            float4 x0_re;
+            float4 x0_im;
+            float4 x1_re;
+            float4 x1_im;
             if (num_element_per_group == 8) {
               // Split interleaved complex array to real array and imag array
               // [re0,im0,re1,im1,re2,im2,re3,im3] ->
               //  ^ x0_lo         ^ x0_hi
               // [re0,re1,re2,re3,im0,im1,im2,im3]
               //  ^ x0_re         ^ x0_im
-              __m128 x0_lo =
-                  _mm_load_ps(reinterpret_cast<float*>(&output_buf[k0]));
-              __m128 x0_hi =
-                  _mm_load_ps(reinterpret_cast<float*>(&output_buf[k0 + 2]));
-              x0_re = _mm_shuffle_ps(x0_lo, x0_hi, _MM_SHUFFLE(2, 0, 2, 0));
-              x0_im = _mm_shuffle_ps(x0_lo, x0_hi, _MM_SHUFFLE(3, 1, 3, 1));
-              __m128 x1_lo =
-                  _mm_load_ps(reinterpret_cast<float*>(&output_buf[k1]));
-              __m128 x1_hi =
-                  _mm_load_ps(reinterpret_cast<float*>(&output_buf[k1 + 2]));
-              x1_re = _mm_shuffle_ps(x1_lo, x1_hi, _MM_SHUFFLE(2, 0, 2, 0));
-              x1_im = _mm_shuffle_ps(x1_lo, x1_hi, _MM_SHUFFLE(3, 1, 3, 1));
+              float4 x0_lo =
+                  FLOAT4_LOAD(reinterpret_cast<float*>(&output_buf[k0]));
+              float4 x0_hi =
+                  FLOAT4_LOAD(reinterpret_cast<float*>(&output_buf[k0 + 2]));
+              FLOAT4_SPLIT_REAL_IMAG(x0_re, x0_im, x0_lo, x0_hi)
+              float4 x1_lo =
+                  FLOAT4_LOAD(reinterpret_cast<float*>(&output_buf[k1]));
+              float4 x1_hi =
+                  FLOAT4_LOAD(reinterpret_cast<float*>(&output_buf[k1 + 2]));
+              FLOAT4_SPLIT_REAL_IMAG(x1_re, x1_im, x1_lo, x1_hi)
             } else {
-              x0_re = _mm_load_ps(reinterpret_cast<float*>(&output_buf[k0]));
+              x0_re = FLOAT4_LOAD(reinterpret_cast<float*>(&output_buf[k0]));
               x0_im =
-                  _mm_load_ps(reinterpret_cast<float*>(&output_buf[k0 + 2]));
-              x1_re = _mm_load_ps(reinterpret_cast<float*>(&output_buf[k1]));
+                  FLOAT4_LOAD(reinterpret_cast<float*>(&output_buf[k0 + 2]));
+              x1_re = FLOAT4_LOAD(reinterpret_cast<float*>(&output_buf[k1]));
               x1_im =
-                  _mm_load_ps(reinterpret_cast<float*>(&output_buf[k1 + 2]));
+                  FLOAT4_LOAD(reinterpret_cast<float*>(&output_buf[k1 + 2]));
             }
             constexpr int num_parallel = 4;
             const int iteration_count = idx / num_parallel;
-            __m128 w_re = _mm_load_ps(
+            float4 w_re = FLOAT4_LOAD(
                 reinterpret_cast<float*>(&_w_arr_split[i][iteration_count]));
-            __m128 w_im = _mm_load_ps(
+            float4 w_im = FLOAT4_LOAD(
                 reinterpret_cast<float*>(&_w_arr_split[i][iteration_count]) +
                 4 /*offset to imag*/);
-            __m128 wx1_re = _mm_sub_ps(
-                _mm_mul_ps(w_re, x1_re),
-                _mm_mul_ps(w_im, x1_im));  // w_re * x1_re - w_im * x1_im
-            __m128 wx1_im = _mm_add_ps(
-                _mm_mul_ps(w_im, x1_re),
-                _mm_mul_ps(w_re, x1_im));  // w_im * x1_re + w_re * x1_im
-            __m128 y0_re = _mm_add_ps(x0_re, wx1_re);  // x0_re + wx1_re
-            __m128 y0_im = _mm_add_ps(x0_im, wx1_im);  // x0_im + wx1_im
-            __m128 y1_re = _mm_sub_ps(x0_re, wx1_re);  // x0_re - wx1_re
-            __m128 y1_im = _mm_sub_ps(x0_im, wx1_im);  // x0_im - wx1_im
+            float4 wx1_re = FLOAT4_SUB(
+                FLOAT4_MUL(w_re, x1_re),
+                FLOAT4_MUL(w_im, x1_im));  // w_re * x1_re - w_im * x1_im
+            float4 wx1_im = FLOAT4_ADD(
+                FLOAT4_MUL(w_im, x1_re),
+                FLOAT4_MUL(w_re, x1_im));  // w_im * x1_re + w_re * x1_im
+            float4 y0_re = FLOAT4_ADD(x0_re, wx1_re);  // x0_re + wx1_re
+            float4 y0_im = FLOAT4_ADD(x0_im, wx1_im);  // x0_im + wx1_im
+            float4 y1_re = FLOAT4_SUB(x0_re, wx1_re);  // x0_re - wx1_re
+            float4 y1_im = FLOAT4_SUB(x0_im, wx1_im);  // x0_im - wx1_im
             if (i + 1 == num_loop && num_element_per_group >= 8) {
               // Redo splitting real and imag
               // [re0,re1,re2,re3,im0,im1,im2,im3] ->
               //  ^ y0_re         ^ y0_im
               // [re0,im0,re1,im1,re2,im2,re3,im3]
               //  ^ y0_lo         ^ y0_hi
-              __m128 y0_lo = _mm_unpacklo_ps(y0_re, y0_im);
-              __m128 y0_hi = _mm_unpackhi_ps(y0_re, y0_im);
-              __m128 y1_lo = _mm_unpacklo_ps(y1_re, y1_im);
-              __m128 y1_hi = _mm_unpackhi_ps(y1_re, y1_im);
-              _mm_store_ps(reinterpret_cast<float*>(&output_buf[k0]), y0_lo);
-              _mm_store_ps(reinterpret_cast<float*>(&output_buf[k0 + 2]),
+              float4 y0_lo;
+              float4 y0_hi;
+              float4 y1_lo;
+              float4 y1_hi;
+              FLOAT4_INTERLEAVE_REAL_IMAG(y0_lo, y0_hi, y0_re, y0_im)
+              FLOAT4_INTERLEAVE_REAL_IMAG(y1_lo, y1_hi, y1_re, y1_im)
+              FLOAT4_STORE(reinterpret_cast<float*>(&output_buf[k0]), y0_lo);
+              FLOAT4_STORE(reinterpret_cast<float*>(&output_buf[k0 + 2]),
                            y0_hi);
-              _mm_store_ps(reinterpret_cast<float*>(&output_buf[k1]), y1_lo);
-              _mm_store_ps(reinterpret_cast<float*>(&output_buf[k1 + 2]),
+              FLOAT4_STORE(reinterpret_cast<float*>(&output_buf[k1]), y1_lo);
+              FLOAT4_STORE(reinterpret_cast<float*>(&output_buf[k1 + 2]),
                            y1_hi);
             } else {
-              _mm_store_ps(reinterpret_cast<float*>(&output_buf[k0]), y0_re);
-              _mm_store_ps(reinterpret_cast<float*>(&output_buf[k0 + 2]),
+              FLOAT4_STORE(reinterpret_cast<float*>(&output_buf[k0]), y0_re);
+              FLOAT4_STORE(reinterpret_cast<float*>(&output_buf[k0 + 2]),
                            y0_im);
-              _mm_store_ps(reinterpret_cast<float*>(&output_buf[k1]), y1_re);
-              _mm_store_ps(reinterpret_cast<float*>(&output_buf[k1 + 2]),
+              FLOAT4_STORE(reinterpret_cast<float*>(&output_buf[k1]), y1_re);
+              FLOAT4_STORE(reinterpret_cast<float*>(&output_buf[k1 + 2]),
                            y1_im);
             }
           }
