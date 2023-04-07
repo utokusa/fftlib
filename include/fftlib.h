@@ -39,9 +39,9 @@ typedef __m128 float4;
 //  ^ src_lo         ^ src_hi
 // [re0,re1,re2,re3,im0,im1,im2,im3]
 //  ^ dst_re         ^ dst_im
-#define FLOAT4_SPLIT_REAL_IMAG(dst_re, dst_im, src_lo, src_hi)    \
-  dst_re = _mm_shuffle_ps(x0_lo, x0_hi, _MM_SHUFFLE(2, 0, 2, 0)); \
-  dst_im = _mm_shuffle_ps(x0_lo, x0_hi, _MM_SHUFFLE(3, 1, 3, 1));
+#define FLOAT4_SPLIT_REAL_IMAG(dst_re, dst_im, src_lo, src_hi)      \
+  dst_re = _mm_shuffle_ps(src_lo, src_hi, _MM_SHUFFLE(2, 0, 2, 0)); \
+  dst_im = _mm_shuffle_ps(src_lo, src_hi, _MM_SHUFFLE(3, 1, 3, 1));
 // Interleave (redo splitting) real and imag
 // [re0,re1,re2,re3,im0,im1,im2,im3] ->
 //  ^ y0_re         ^ y0_im
