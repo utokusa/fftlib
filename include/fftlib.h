@@ -495,9 +495,11 @@ class Fft<float> {
   // floatwiddle factor ('W' in textbooks)
   std::vector<std::complex<float>> w_arr;
   std::vector<std::complex<float>> w_arr_inverse;
-  std::vector<std::vector<std::array<float, 8 /*for 4 float complex number*/>>>
+  std::vector<std::vector<
+      std::array<float, SIMD_WIDTH * 2 /*for 4 float complex number*/>>>
       w_arr_split;
-  std::vector<std::vector<std::array<float, 8>>> w_arr_inverse_split;
+  std::vector<std::vector<std::array<float, SIMD_WIDTH * 2>>>
+      w_arr_inverse_split;
   std::vector<unsigned long> bit_reverse_arr;
 
   inline unsigned long reverseBitsCached(unsigned long x) {
