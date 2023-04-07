@@ -28,6 +28,7 @@ namespace fftlib {
 #if defined(__SSE__)
 #define SIMD_SUPPORT
 typedef __m128 float4;
+#define SIMD_WIDTH 4
 #define FLOAT4_LOAD(p) _mm_load_ps(p)
 #define FLOAT4_STORE(p, v) _mm_store_ps(p, v)
 #define FLOAT4_ADD(a, b) _mm_add_ps(a, b)
@@ -52,6 +53,7 @@ typedef __m128 float4;
 #elif defined(__ARM_NEON)
 #define SIMD_SUPPORT
 typedef float32x4_t float4;
+#define SIMD_WIDTH 4
 #define FLOAT4_LOAD(p) vld1q_f32(p)
 #define FLOAT4_STORE(p, v) vst1q_f32(p, v)
 #define FLOAT4_ADD(a, b) vaddq_f32(a, b)
@@ -280,11 +282,9 @@ class Fft<float> {
           static_cast<size_t>(std::pow(2, i + 1));
       ;
       const auto num_group = n / num_element_per_group;
-      const int num_paralell = 4;
       w_arr_split.emplace_back();
       w_arr_inverse_split.emplace_back();
-      for (size_t idx = 0; idx < num_element_per_group / 2;
-           idx += num_paralell) {
+      for (size_t idx = 0; idx < num_element_per_group / 2; idx += SIMD_WIDTH) {
         w_arr_split.back().emplace_back();
         auto& w_slot = w_arr_split.back().back();
         w_slot[0] = twiddleFactor<float>((idx + 0) * num_group, n).real();
@@ -338,7 +338,7 @@ class Fft<float> {
           static_cast<size_t>(std::pow(2, i + 1));
       ;
       const auto num_group = n / num_element_per_group;
-      if (num_element_per_group <= 4) {
+      if (num_element_per_group <= SIMD_WIDTH) {
         // Do FFT normally
         for (size_t j = 0; j < num_group; j++) {
           // k0: index for the first half of group
@@ -383,7 +383,7 @@ class Fft<float> {
             float4 x0_im;
             float4 x1_re;
             float4 x1_im;
-            if (num_element_per_group == 8) {
+            if (num_element_per_group == SIMD_WIDTH * 2) {
               // Split interleaved complex array to real array and imag array
               // [re0,im0,re1,im1,re2,im2,re3,im3] ->
               //  ^ x0_lo         ^ x0_hi
@@ -391,29 +391,28 @@ class Fft<float> {
               //  ^ x0_re         ^ x0_im
               float4 x0_lo =
                   FLOAT4_LOAD(reinterpret_cast<float*>(&output_buf[k0]));
-              float4 x0_hi =
-                  FLOAT4_LOAD(reinterpret_cast<float*>(&output_buf[k0 + 2]));
+              float4 x0_hi = FLOAT4_LOAD(
+                  reinterpret_cast<float*>(&output_buf[k0 + SIMD_WIDTH / 2]));
               FLOAT4_SPLIT_REAL_IMAG(x0_re, x0_im, x0_lo, x0_hi)
               float4 x1_lo =
                   FLOAT4_LOAD(reinterpret_cast<float*>(&output_buf[k1]));
-              float4 x1_hi =
-                  FLOAT4_LOAD(reinterpret_cast<float*>(&output_buf[k1 + 2]));
+              float4 x1_hi = FLOAT4_LOAD(
+                  reinterpret_cast<float*>(&output_buf[k1 + SIMD_WIDTH / 2]));
               FLOAT4_SPLIT_REAL_IMAG(x1_re, x1_im, x1_lo, x1_hi)
             } else {
               x0_re = FLOAT4_LOAD(reinterpret_cast<float*>(&output_buf[k0]));
-              x0_im =
-                  FLOAT4_LOAD(reinterpret_cast<float*>(&output_buf[k0 + 2]));
+              x0_im = FLOAT4_LOAD(
+                  reinterpret_cast<float*>(&output_buf[k0 + SIMD_WIDTH / 2]));
               x1_re = FLOAT4_LOAD(reinterpret_cast<float*>(&output_buf[k1]));
-              x1_im =
-                  FLOAT4_LOAD(reinterpret_cast<float*>(&output_buf[k1 + 2]));
+              x1_im = FLOAT4_LOAD(
+                  reinterpret_cast<float*>(&output_buf[k1 + SIMD_WIDTH / 2]));
             }
-            constexpr int num_parallel = 4;
-            const int iteration_count = idx / num_parallel;
+            const int iteration_count = idx / SIMD_WIDTH;
             float4 w_re = FLOAT4_LOAD(
                 reinterpret_cast<float*>(&_w_arr_split[i][iteration_count]));
             float4 w_im = FLOAT4_LOAD(
                 reinterpret_cast<float*>(&_w_arr_split[i][iteration_count]) +
-                4 /*offset to imag*/);
+                SIMD_WIDTH /*offset to imag*/);
             float4 wx1_re = FLOAT4_SUB(
                 FLOAT4_MUL(w_re, x1_re),
                 FLOAT4_MUL(w_im, x1_im));  // w_re * x1_re - w_im * x1_im
@@ -424,7 +423,7 @@ class Fft<float> {
             float4 y0_im = FLOAT4_ADD(x0_im, wx1_im);  // x0_im + wx1_im
             float4 y1_re = FLOAT4_SUB(x0_re, wx1_re);  // x0_re - wx1_re
             float4 y1_im = FLOAT4_SUB(x0_im, wx1_im);  // x0_im - wx1_im
-            if (i + 1 == num_loop && num_element_per_group >= 8) {
+            if (i + 1 == num_loop && num_element_per_group >= SIMD_WIDTH) {
               // Redo splitting real and imag
               // [re0,re1,re2,re3,im0,im1,im2,im3] ->
               //  ^ y0_re         ^ y0_im
@@ -437,18 +436,22 @@ class Fft<float> {
               FLOAT4_INTERLEAVE_REAL_IMAG(y0_lo, y0_hi, y0_re, y0_im)
               FLOAT4_INTERLEAVE_REAL_IMAG(y1_lo, y1_hi, y1_re, y1_im)
               FLOAT4_STORE(reinterpret_cast<float*>(&output_buf[k0]), y0_lo);
-              FLOAT4_STORE(reinterpret_cast<float*>(&output_buf[k0 + 2]),
-                           y0_hi);
+              FLOAT4_STORE(
+                  reinterpret_cast<float*>(&output_buf[k0 + SIMD_WIDTH / 2]),
+                  y0_hi);
               FLOAT4_STORE(reinterpret_cast<float*>(&output_buf[k1]), y1_lo);
-              FLOAT4_STORE(reinterpret_cast<float*>(&output_buf[k1 + 2]),
-                           y1_hi);
+              FLOAT4_STORE(
+                  reinterpret_cast<float*>(&output_buf[k1 + SIMD_WIDTH / 2]),
+                  y1_hi);
             } else {
               FLOAT4_STORE(reinterpret_cast<float*>(&output_buf[k0]), y0_re);
-              FLOAT4_STORE(reinterpret_cast<float*>(&output_buf[k0 + 2]),
-                           y0_im);
+              FLOAT4_STORE(
+                  reinterpret_cast<float*>(&output_buf[k0 + SIMD_WIDTH / 2]),
+                  y0_im);
               FLOAT4_STORE(reinterpret_cast<float*>(&output_buf[k1]), y1_re);
-              FLOAT4_STORE(reinterpret_cast<float*>(&output_buf[k1 + 2]),
-                           y1_im);
+              FLOAT4_STORE(
+                  reinterpret_cast<float*>(&output_buf[k1 + SIMD_WIDTH / 2]),
+                  y1_im);
             }
           }
         }
