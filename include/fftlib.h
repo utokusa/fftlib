@@ -316,20 +316,36 @@ class Fft<float> {
           for (size_t k0 = k0_start; k0 < k0_end; k0 += 4) {
             const auto k1 = k0 + num_element_per_group / 2;
             const auto idx = k0 - k0_start;
+            __m128 x0_re;
+            __m128 x0_im;
+            __m128 x1_re;
+            __m128 x1_im;
             if (num_element_per_group == 8) {
-              float* out_split_k0 = reinterpret_cast<float*>(&output_buf[k0]);
-              split4complexNumsToReIm(out_split_k0);
-              float* out_split_k1 = reinterpret_cast<float*>(&output_buf[k1]);
-              split4complexNumsToReIm(out_split_k1);
+              // Split interleaved complex array to real array and imag array
+              // [re0,im0,re1,im1,re2,im2,re3,im3] ->
+              //  ^ x0_lo         ^ x0_hi
+              // [re0,re1,re2,re3,im0,im1,im2,im3]
+              //  ^ x0_re         ^ x0_im
+              __m128 x0_lo =
+                  _mm_load_ps(reinterpret_cast<float*>(&output_buf[k0]));
+              __m128 x0_hi =
+                  _mm_load_ps(reinterpret_cast<float*>(&output_buf[k0 + 2]));
+              x0_re = _mm_shuffle_ps(x0_lo, x0_hi, _MM_SHUFFLE(2, 0, 2, 0));
+              x0_im = _mm_shuffle_ps(x0_lo, x0_hi, _MM_SHUFFLE(3, 1, 3, 1));
+              __m128 x1_lo =
+                  _mm_load_ps(reinterpret_cast<float*>(&output_buf[k1]));
+              __m128 x1_hi =
+                  _mm_load_ps(reinterpret_cast<float*>(&output_buf[k1 + 2]));
+              x1_re = _mm_shuffle_ps(x1_lo, x1_hi, _MM_SHUFFLE(2, 0, 2, 0));
+              x1_im = _mm_shuffle_ps(x1_lo, x1_hi, _MM_SHUFFLE(3, 1, 3, 1));
+            } else {
+              x0_re = _mm_load_ps(reinterpret_cast<float*>(&output_buf[k0]));
+              x0_im =
+                  _mm_load_ps(reinterpret_cast<float*>(&output_buf[k0 + 2]));
+              x1_re = _mm_load_ps(reinterpret_cast<float*>(&output_buf[k1]));
+              x1_im =
+                  _mm_load_ps(reinterpret_cast<float*>(&output_buf[k1 + 2]));
             }
-            __m128 x0_re =
-                _mm_load_ps(reinterpret_cast<float*>(&output_buf[k0]));
-            __m128 x0_im =
-                _mm_load_ps(reinterpret_cast<float*>(&output_buf[k0 + 2]));
-            __m128 x1_re =
-                _mm_load_ps(reinterpret_cast<float*>(&output_buf[k1]));
-            __m128 x1_im =
-                _mm_load_ps(reinterpret_cast<float*>(&output_buf[k1 + 2]));
             constexpr int num_parallel = 4;
             const int iteration_count = idx / num_parallel;
             __m128 w_re = _mm_load_ps(
@@ -347,16 +363,29 @@ class Fft<float> {
             __m128 y0_im = _mm_add_ps(x0_im, wx1_im);  // x0_im + wx1_im
             __m128 y1_re = _mm_sub_ps(x0_re, wx1_re);  // x0_re - wx1_re
             __m128 y1_im = _mm_sub_ps(x0_im, wx1_im);  // x0_im - wx1_im
-            _mm_store_ps(reinterpret_cast<float*>(&output_buf[k0]), y0_re);
-            _mm_store_ps(reinterpret_cast<float*>(&output_buf[k0 + 2]), y0_im);
-            _mm_store_ps(reinterpret_cast<float*>(&output_buf[k1]), y1_re);
-            _mm_store_ps(reinterpret_cast<float*>(&output_buf[k1 + 2]), y1_im);
-            if (i == num_loop - 1 && num_element_per_group >= 8) {
+            if (i + 1 == num_loop && num_element_per_group >= 8) {
               // Redo splitting real and imag
-              float* out_split_k0 = reinterpret_cast<float*>(&output_buf[k0]);
-              redoSplit4complexNumsToReIm(out_split_k0);
-              float* out_split_k1 = reinterpret_cast<float*>(&output_buf[k1]);
-              redoSplit4complexNumsToReIm(out_split_k1);
+              // [re0,re1,re2,re3,im0,im1,im2,im3] ->
+              //  ^ y0_re         ^ y0_im
+              // [re0,im0,re1,im1,re2,im2,re3,im3]
+              //  ^ y0_lo         ^ y0_hi
+              __m128 y0_lo = _mm_unpacklo_ps(y0_re, y0_im);
+              __m128 y0_hi = _mm_unpackhi_ps(y0_re, y0_im);
+              __m128 y1_lo = _mm_unpacklo_ps(y1_re, y1_im);
+              __m128 y1_hi = _mm_unpackhi_ps(y1_re, y1_im);
+              _mm_store_ps(reinterpret_cast<float*>(&output_buf[k0]), y0_lo);
+              _mm_store_ps(reinterpret_cast<float*>(&output_buf[k0 + 2]),
+                           y0_hi);
+              _mm_store_ps(reinterpret_cast<float*>(&output_buf[k1]), y1_lo);
+              _mm_store_ps(reinterpret_cast<float*>(&output_buf[k1 + 2]),
+                           y1_hi);
+            } else {
+              _mm_store_ps(reinterpret_cast<float*>(&output_buf[k0]), y0_re);
+              _mm_store_ps(reinterpret_cast<float*>(&output_buf[k0 + 2]),
+                           y0_im);
+              _mm_store_ps(reinterpret_cast<float*>(&output_buf[k1]), y1_re);
+              _mm_store_ps(reinterpret_cast<float*>(&output_buf[k1 + 2]),
+                           y1_im);
             }
           }
         }
@@ -408,38 +437,6 @@ class Fft<float> {
   inline unsigned long reverseBitsCached(unsigned long x) {
     assert(x < bit_reverse_arr.size());
     return bit_reverse_arr[x];
-  }
-
-  static inline void split4complexNumsToReIm(float* buf) {
-    // Split real and imag
-    // [re0,im0,re1,im1,re2,im2,re3,im3] -> [re0,re1,re2,re3,im0,im1,im2,im3]
-    //      ^   ^
-    std::swap(buf[1], buf[2]);
-    // [re0,re1,im0,im1,re2,im2,re3,im3]
-    //          ^       ^
-    std::swap(buf[2], buf[4]);
-    // [re0,re1,re2,im1,im0,im2,re3,im3]
-    //              ^           ^
-    std::swap(buf[3], buf[6]);
-    // [re0,re1,re2,re3,im0,im2,im1,im3]
-    //                      ^   ^
-    std::swap(buf[5], buf[6]);
-  }
-
-  static inline void redoSplit4complexNumsToReIm(float* buf) {
-    // Split real and imag
-    // [re0,re1,re2,re3,im0,im1,im2,im3] -> [re0,im0,re1,im1,re2,im2,re3,im3]
-    //      ^           ^
-    std::swap(buf[1], buf[4]);
-    // [re0,im0,re2,re3,re1,im1,im2,im3]
-    //          ^       ^
-    std::swap(buf[2], buf[4]);
-    // [re0,im0,re1,re3,re2,im1,im2,im3]
-    //              ^       ^
-    std::swap(buf[3], buf[5]);
-    // [re0,im0,re1,im1,re2,re3,im2,im3]
-    //                      ^   ^
-    std::swap(buf[5], buf[6]);
   }
 };
 
