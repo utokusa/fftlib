@@ -8,7 +8,9 @@
 
 #pragma once
 
+#ifdef __SSE__
 #include <xmmintrin.h>
+#endif
 
 #include <array>
 #include <cassert>
@@ -186,6 +188,7 @@ class Fft {
   }
 };
 
+#ifdef __SSE__
 // FFfloat implementation with Cooley–floatukey FFfloat algorithm (decimation in
 // time)
 template <>
@@ -439,5 +442,6 @@ class Fft<float> {
     return bit_reverse_arr[x];
   }
 };
+#endif
 
 }  // namespace fftlib
