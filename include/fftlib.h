@@ -111,14 +111,15 @@ std::complex<T> twiddleFactor(int x, size_t n) {
   return std::exp(w_angle);
 }
 
-// template <class T>
-// void printVec(T* vec, size_t n) {
-//   for (size_t i = 0; i < n; i++) {
-//     std::cout << std::fixed << std::setw(7) << std::setprecision(2)
-//               << std::right;
-//     std::cout << vec[i] << (i + 1 < n ? "," : "\n");
-//   }
-// }
+// Only useful for debug
+template <class T>
+[[maybe_unused]] void printVec(T* vec, size_t n) {
+  for (size_t i = 0; i < n; i++) {
+    std::cout << std::fixed << std::setw(7) << std::setprecision(2)
+              << std::right;
+    std::cout << vec[i] << (i + 1 < n ? "," : "\n");
+  }
+}
 
 // FFT implementation with Cooley–Tukey FFT algorithm (decimation in time)
 template <class T>
