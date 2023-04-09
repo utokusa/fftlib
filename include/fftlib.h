@@ -83,9 +83,9 @@ typedef float32x4_t float4;
   }
 #endif
 
-bool isPowerOfTwo(int x) { return (x & (x - 1)) == 0; }
+inline bool isPowerOfTwo(int x) { return (x & (x - 1)) == 0; }
 
-unsigned long bitLength(unsigned long x) {
+inline unsigned long bitLength(unsigned long x) {
   unsigned long length = 0;
   while (x) {
     x >>= 1;
@@ -94,7 +94,7 @@ unsigned long bitLength(unsigned long x) {
   return length;
 }
 
-unsigned long reverseBits(unsigned long x, unsigned long bit_length) {
+inline unsigned long reverseBits(unsigned long x, unsigned long bit_length) {
   unsigned long rev = 0;
   for (unsigned long i = 0; i < bit_length; i++) {
     rev <<= 1;
