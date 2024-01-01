@@ -14,6 +14,10 @@
 #include <arm_neon.h>
 #endif
 
+// To use M_PI with MSVC
+// https://learn.microsoft.com/en-us/cpp/c-runtime-library/math-constants?view=msvc-170
+#define _USE_MATH_DEFINES
+
 #include <array>
 #include <cassert>
 #include <cmath>
