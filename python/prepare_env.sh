@@ -9,6 +9,8 @@ ENV_NAME=env
 SCRIPT_DIR=$(cd $(dirname $0); pwd)
 PYTHON_DIR=$SCRIPT_DIR/$ENV_NAME
 if [ ! -f "env/bin/activate" ]; then
+    apt update
+    apt install python3.10-venv -y
     python3 -m venv $PYTHON_DIR
 fi
 
