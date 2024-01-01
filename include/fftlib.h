@@ -17,10 +17,10 @@
 // To use M_PI with MSVC
 // https://learn.microsoft.com/en-us/cpp/c-runtime-library/math-constants?view=msvc-170
 #define _USE_MATH_DEFINES
+#include <math.h>
 
 #include <array>
 #include <cassert>
-#include <cmath>
 #include <complex>
 #include <iomanip>
 #include <iostream>
